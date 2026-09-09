@@ -78,6 +78,8 @@ A runtime string-table dump also exposed a large amount of Respondus' internal c
                  Telemetry / Policy Logic
                            |
                 LockDownService215.sys
+
+```text
 VM State Encoding
 
 Function:
