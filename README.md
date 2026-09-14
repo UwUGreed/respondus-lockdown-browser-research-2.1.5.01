@@ -1,71 +1,34 @@
 # Respondus LockDown Browser 2.1.5.01 — Reverse Engineering Research
 
-> Static and dynamic reverse-engineering research into Respondus LockDown Browser 2.1.5.01, including VM/environment detection, hardware inspection, process monitoring, runtime string tables, Windows session detection, policy controls, and kernel-driver behavior.
+> Static and dynamic reverse-engineering research into Respondus LockDown Browser 2.1.5.01, including VM/environment classification, hardware inspection, process/runtime artifact monitoring, internal telemetry, policy state, obfuscated control flow, and kernel-driver behavior.
 
-**Suggested repository name:** `respondus-lockdown-browser-research-2.1.5.01`
+**Repository:** `respondus-lockdown-browser-research-2.1.5.01`
 
-**GitHub description:**  
-Reverse-engineering notes and technical findings for Respondus LockDown Browser 2.1.5.01, including VM detection, process monitoring, runtime string tables, device/BIOS checks, and kernel-driver behavior.
+**Description:**  
+Reverse-engineering notes and technical findings for Respondus LockDown Browser 2.1.5.01, including VM detection, device/BIOS inspection, runtime artifact monitoring, internal detection state, obfuscation, and kernel-driver behavior.
 
 ---
 
 > [!IMPORTANT]
-> **Research scope:** Static and dynamic analysis of Respondus LockDown Browser behavior and architecture.
+> ## Research Scope
 >
-> This repository documents observed findings, indicators, architecture, and detection mechanisms. It does **not** contain a working bypass implementation.
+> This repository documents observed behavior and architecture from reverse-engineering Respondus LockDown Browser.
 >
-> Findings marked as **confirmed** were directly supported by the analyzed binary, imports, runtime behavior, recovered runtime data, or direct tracing. Items marked **unconfirmed** still require additional tracing before their exact purpose can be stated.
-
----
-
-# Table of Contents
-
-- [Target](#target)
-- [Artifact Metadata](#artifact-metadata)
-- [Executive Summary](#executive-summary)
-- [High-Level Architecture](#high-level-architecture)
-- [VM State Encoding](#vm-state-encoding)
-- [Detection Result Encoding](#detection-result-encoding)
-- [String Comparison Helpers](#string-comparison-helpers)
-- [Runtime String Table](#runtime-string-table)
-- [Dynamic Runtime Tracing](#dynamic-runtime-tracing)
-- [Device Enumeration](#device-enumeration)
-- [Confirmed Device Detection Prefix List](#confirmed-device-detection-prefix-list)
-- [BIOS / Registry Detection Structure](#bios--registry-detection-structure)
-- [`VBoxAsw` Special Handling](#vboxasw-special-handling)
-- [Device Inventory / FNV-1a De-Duplication](#device-inventory--fnv-1a-de-duplication)
-- [COM FriendlyName Enumeration](#com-friendlyname-enumeration)
-- [BIOS / Baseboard / System Product Inspection](#bios--baseboard--system-product-inspection)
-- [Virtualization / Environment Indicators](#virtualization--environment-indicators)
-- [Important Runtime Strings](#important-runtime-strings)
-- [Recording / Remote-Control / Capture Process List](#recording--remote-control--capture-process-list)
-- [Accessibility / Assistive Technology List](#accessibility--assistive-technology-list)
-- [Browser Blocking List](#browser-blocking-list)
-- [Standalone Process / Application Indicators](#standalone-process--application-indicators)
-- [Remote Desktop / Session Checks](#remote-desktop--session-checks)
-- [Sysinternals Handling](#sysinternals-handling)
-- [Recording / Capture Controls](#recording--capture-controls)
-- [Windows Game Bar / Capture Handling](#windows-game-bar--capture-handling)
-- [Speech / Voice Activation Checks](#speech--voice-activation-checks)
-- [Process Enumeration Capability](#process-enumeration-capability)
-- [Service Enumeration Capability](#service-enumeration-capability)
-- [Registry Inspection](#registry-inspection)
-- [Debugger / Timing Capabilities](#debugger--timing-capabilities)
-- [Main DLL Findings](#main-dll-findings)
-- [Kernel Driver](#kernel-driver)
-- [Driver FLTMGR Capabilities](#driver-fltmgr-capabilities)
-- [Driver Process / Thread / Image Monitoring](#driver-process--thread--image-monitoring)
-- [Driver Cryptographic Capabilities](#driver-cryptographic-capabilities)
-- [User-Mode / Kernel Communication](#user-mode--kernel-communication)
-- [Tamper / Integrity Strings](#tamper--integrity-strings)
-- [Policy / Configuration Names](#policy--configuration-names)
-- [Respondus Infrastructure](#respondus-infrastructure)
-- [Confirmed vs. Unconfirmed Findings](#confirmed-vs-unconfirmed-findings)
-- [Current Reverse Engineering Map](#current-reverse-engineering-map)
-- [Next Research Targets](#next-research-targets)
-- [Current Conclusion](#current-conclusion)
-- [Credits](#credits)
-- [Disclaimer](#disclaimer)
+> It focuses on:
+>
+> - detection mechanisms
+> - program architecture
+> - runtime state
+> - telemetry
+> - Windows internals
+> - driver capabilities
+> - control-flow protection
+>
+> It does **not** contain a working examination-security bypass.
+>
+> Findings labeled **confirmed** are directly supported by static analysis, runtime data, API usage, tracing, or reconstructed control flow.
+>
+> Findings labeled **unconfirmed** remain hypotheses until additional evidence is recovered.
 
 ---
 
@@ -73,59 +36,45 @@ Reverse-engineering notes and technical findings for Respondus LockDown Browser 
 
 | Property | Value |
 | --- | --- |
-| **Product** | Respondus LockDown Browser |
-| **Version** | `2.1.5.01` |
-| **Installer** | `LockDownBrowser-2-1-5-01-158741422.msi` |
-| **Main executable** | `LockDownBrowser.exe` |
-| **Main DLL** | `LockDownBrowser.dll` |
-| **Kernel driver** | `LockDownService215.sys` |
+| Product | Respondus LockDown Browser |
+| Version | `2.1.5.01` |
+| Installer | `LockDownBrowser-2-1-5-01-158741422.msi` |
+| Main executable | `LockDownBrowser.exe` |
+| Main DLL | `LockDownBrowser.dll` |
+| Kernel driver | `LockDownService215.sys` |
 
 ---
 
 # Artifact Metadata
 
-## Main Executable
+## LockDownBrowser.exe
 
 ```text
-LockDownBrowser.exe
-```
-
 Observed size:
-
-```text
 20,699,584 bytes
-```
 
 Ghidra image base:
-
-```text
 0x140000000
 ```
 
 ---
 
-## Main DLL
+## LockDownBrowser.dll
 
 ```text
-LockDownBrowser.dll
-```
-
-Version information:
-
-```text
-FileVersion:    23.10.31.1
-ProductVersion: 2.1.1.5
+FileVersion:     23.10.31.1
+ProductVersion:  2.1.1.5
 FileDescription: LockDown Browser
-Company: Respondus, Inc.
+Company:         Respondus, Inc.
 ```
 
-Observed image base:
+Image base:
 
 ```text
 0x180000000
 ```
 
-Observed sections include:
+Observed sections:
 
 ```text
 .text
@@ -138,7 +87,7 @@ Observed sections include:
 .reloc
 ```
 
-The `.cldb` section was observed as approximately:
+The `.cldb` section is approximately:
 
 ```text
 0x200 bytes
@@ -146,7 +95,7 @@ Read/Write
 Non-executable
 ```
 
-Observed exports include:
+Observed exports:
 
 ```text
 CLDBDoSomeOtherStuff
@@ -164,15 +113,10 @@ C:\VS12\LockDownChrome-HookDLL\x64\Release\LockDownBrowser.pdb
 
 ---
 
-## Kernel Driver
+## LockDownService215.sys
 
 ```text
-LockDownService215.sys
-```
-
 Version:
-
-```text
 2.15.0.1
 ```
 
@@ -188,267 +132,270 @@ Installed path:
 C:\Windows\System32\drivers\LockDownService215.sys
 ```
 
+Observed configuration:
+
+```text
+Service:     LockDownService215
+Type:        FILE_SYSTEM_DRIVER
+Start type:  SYSTEM_START
+Group:       FSFilter Bottom
+Dependency:  FltMgr
+Altitude:    47777
+Instances:   4
+Frame:       0
+```
+
 Ghidra image base:
 
 ```text
 0x140000000
 ```
 
-Recovered PDB filename:
+Recovered debugging information:
 
 ```text
-LockDownService215.pdb
-```
-
-PDB GUID:
-
-```text
-9c670681-69fd-4e8f-ac01-e52be2132b12
-```
-
-PDB age:
-
-```text
-1
+PDB:  LockDownService215.pdb
+GUID: 9c670681-69fd-4e8f-ac01-e52be2132b12
+Age:  1
 ```
 
 ---
 
 # Executive Summary
 
-Respondus LockDown Browser does not rely on one isolated virtual-machine check.
+Respondus LockDown Browser 2.1.5.01 contains a broad environment-classification system rather than one isolated virtual-machine check.
 
-The analyzed build contains multiple independent environment-monitoring, classification, policy, integrity, and enforcement systems.
+The analyzed build performs checks across several independent surfaces:
 
-Observed capabilities include:
+```text
+Hardware identity
+Windows device inventory
+BIOS / registry values
+CPU identity
+COM device names
+Process/module paths
+Runtime artifact collections
+Windows desktops and sessions
+Recording / remote-control applications
+Accessibility software
+Wine / compatibility-layer indicators
+Application virtualization indicators
+Kernel process/thread/image events
+Filesystem activity
+Integrity / tamper state
+```
 
-- Device enumeration
-- Device-description inspection
-- Device friendly-name inspection
-- Explicit VM-device prefix matching
-- BIOS inspection
-- Baseboard inspection
-- System-product inspection
-- CPU identity inspection
-- Registry-based VM indicators
-- Process enumeration
-- Module enumeration
-- Service enumeration
-- Windows session/RDP inspection
-- Recording/capture application detection
-- Remote-control software detection
-- Browser blocking
-- Sysinternals-related desktop handling
-- Accessibility-software handling
-- Wine-related indicators
-- VirtualBox-related handling
-- VMware indicators
-- Parallels indicators
-- QEMU indicators
-- Xen indicators
-- VirtIO indicators
-- AWS virtual-device indicators
-- Cameyo virtualization indicators
-- Kernel filesystem monitoring
-- Kernel process callbacks
-- Kernel thread callbacks
-- Kernel image-load callbacks
-- User-mode ↔ kernel communication
-- Policy-controlled detection categories
-- Program-integrity / tamper detection
+Several internal environment categories are eventually represented through:
 
-One of the most useful discoveries was a runtime string table containing a large amount of Respondus' internal configuration, detection vocabulary, platform indicators, process lists, hardware indicators, and policy names in plaintext.
+```text
+rldbvm = 0
+rldbvm = 1
+rldbvm = 2
+rldbvm = 3
+```
 
-Dynamic instrumentation later exposed the exact runtime consumers of multiple environment-related strings and allowed the full VM/device prefix array and BIOS/registry comparison structure to be recovered.
+A separate serialized detection state is exposed through:
+
+```text
+rldbdetect
+```
+
+The exact semantics of every numeric category are not yet known, but the writer architecture for all three non-zero `rldbvm` categories has now been substantially reconstructed.
+
+A second major finding is that the executable uses heavy control-flow protection involving:
+
+```text
+overlapping instructions
+opaque predicates
+embedded RET gadgets
+synthetic return stacks
+arithmetic gadgets
+computed dispatch
+```
+
+This significantly reduces the usefulness of naïve Ghidra function boundaries and decompilation in protected regions.
 
 ---
 
 # High-Level Architecture
 
 ```text
-                        LockDownBrowser.exe
-                               |
-          +--------------------+--------------------+
-          |                    |                    |
-       Processes            Hardware             Sessions
-       Services             Devices              RDP
-       Modules              BIOS                 Desktop
-          |                 Registry                |
-          +--------------------+--------------------+
-                               |
-                     Environment / Detection
-                           Accumulators
-                               |
-                +--------------+--------------+
-                |                             |
-             rldbvm                       rldbdetect
-                |                             |
-                +--------------+--------------+
-                               |
-                     Telemetry / Policy
-                               |
+                         LockDownBrowser.exe
+                                 |
+       +-------------------------+-------------------------+
+       |                         |                         |
+    Hardware                  Runtime                   Sessions
+    Devices                   Processes                 Desktop
+    BIOS                      Modules                   RDP
+    Registry                  Artifacts                 WTS
+       |                         |                         |
+       +-------------------------+-------------------------+
+                                 |
+                      Detection / Classification
+                                 |
+             +-------------------+-------------------+
+             |                   |                   |
+         rldbvm = 1          rldbvm = 2          rldbvm = 3
+             |                   |                   |
+             +-------------------+-------------------+
+                                 |
+                           rldbdetect
+                                 |
+                        Telemetry / Policy
+                                 |
                     LockDownService215.sys
 ```
 
-The currently observed architecture suggests that several user-mode inspection mechanisms feed persistent global detection state, which is then consumed by later policy, telemetry, and enforcement logic.
+Current evidence indicates that detection and classification are distributed across several subsystems rather than accumulated through one single Boolean.
 
 ---
 
-# VM State Encoding
+# Internal VM State
 
-## Function
+## Serializer
+
+Function:
 
 ```text
 FUN_1401ea670
 ```
 
-Respondus exposes an internal VM state through the field:
+Observed state fields:
 
 ```text
-rldbvm
+DAT_140ccc948 + 0x4664A -> rldbvm = "1"
+DAT_140ccc948 + 0x4664B -> rldbvm = "2"
+DAT_140ccc948 + 0x46538 -> rldbvm = "3"
 ```
 
-Observed values:
-
-```text
-rldbvm = "0"
-rldbvm = "1"
-rldbvm = "2"
-rldbvm = "3"
-```
-
-Observed mapping:
-
-```text
-DAT_140ccc948 + 0x4664a != 0  -> rldbvm = "1"
-DAT_140ccc948 + 0x4664b != 0  -> rldbvm = "2"
-DAT_140ccc948 + 0x46538 != 0  -> rldbvm = "3"
-```
-
-Otherwise:
+If none are set:
 
 ```text
 rldbvm = "0"
 ```
 
-Another flag:
+Another field:
 
 ```text
 DAT_140ccc948 + 0x46651
 ```
 
-causes:
+causes both:
 
 ```text
 rldbvm     = "0"
 rldbdetect = "0"
 ```
 
-The exact semantic meaning of VM categories `1`, `2`, and `3` is still under investigation.
+Its exact purpose remains unresolved.
 
-These values should currently be treated as **internal environment categories**, not as direct aliases for individual VM products.
+---
+
+# VM Classification Summary
+
+| Internal state | Current interpretation | Confidence |
+| --- | --- | --- |
+| `rldbvm=1` | Hardware/platform classification | High |
+| `rldbvm=2` | Recognizable runtime/software environment | High |
+| `rldbvm=3` | Expected-device consistency failure | High |
+| `rldbvm=0` | No active VM category serialized | Confirmed |
+
+These descriptions represent the current structural interpretation.
+
+They should **not** yet be translated directly into:
+
+```text
+1 = VMware
+2 = VirtualBox
+3 = ...
+```
+
+because the categories aggregate multiple independent conditions.
 
 ---
 
 # Detection Result Encoding
 
-## Function
+Function:
 
 ```text
 FUN_140262110
 ```
 
-This function appears to serialize already-computed detection flags rather than perform the original checks itself.
+This function serializes existing internal flags into `rldbdetect`.
 
 Observed mappings:
 
-| Internal field | Detection value |
+| Field | Serialized value |
 | --- | ---: |
-| `object + 0x2d4` | `1` |
-| `object + 0x479` | `2` |
-| `object + 0x300` | `3` |
-| `object + 0x2d5` | `4` |
-| `object + 0x2d6` | `5` |
-| `object + 0x2d7` | `6` |
-| `object + 0x3fc` | `9` |
-| `global + 0x448` | `10` |
-| `object + 0x388` | `13` |
-| `object + 0x2d9` | `16` |
-| `object + 0x278` | `17` |
-| `object + 0x279` | `18` |
+| `+0x2D4` | `1` |
+| `+0x479` | `2` |
+| `+0x300` | `3` |
+| `+0x2D5` | `4` |
+| `+0x2D6` | `5` |
+| `+0x2D7` | `6` |
+| `+0x3FC` | `9` |
+| global `+0x448` | `10` |
+| `+0x388` | `13` |
+| `+0x2D9` | `16` |
+| `+0x278` | `17` |
+| `+0x279` | `18` |
 
-The exact semantic meaning of each numeric detection code has not yet been fully mapped.
+The function appears to be a serializer rather than the original source of these detections.
 
 ---
 
-# String Comparison Helpers
+# Comparison Helpers
 
-## Case-Insensitive Prefix Match
+## `FUN_140296900`
 
-Function:
+Case-insensitive prefix comparison.
 
-```text
-FUN_140296900
-```
-
-Observed behavior is approximately equivalent to:
+Equivalent concept:
 
 ```c
-_strnicmp(value, prefix, strlen(prefix)) == 0
+_strnicmp(value, prefix, strlen(prefix))
+```
+
+Important return convention:
+
+```text
+0     -> prefix matched
+non-0 -> mismatch
+```
+
+This matters when interpreting several obfuscated callers.
+
+---
+
+## `FUN_140297050`
+
+Case-insensitive substring search.
+
+Observed callers establish:
+
+```text
+non-zero -> substring found
+zero     -> substring not found
 ```
 
 Conceptually:
 
-```text
-StartsWithIgnoreCase(value, prefix)
-```
-
-This helper is heavily used in VM/hardware/device classification.
-
----
-
-## Case-Insensitive Substring Match
-
-Function:
-
-```text
-FUN_140297050
-```
-
-Equivalent behavior:
-
 ```c
-bool ContainsIgnoreCase(char *haystack, char *needle)
-{
-    size_t len = strlen(needle);
-
-    for (char *p = haystack; p && *p; ++p)
-    {
-        if (_strnicmp(p, needle, len) == 0)
-            return true;
-    }
-
-    return false;
-}
-```
-
-Conceptually:
-
-```text
-ContainsIgnoreCase(value, pattern)
+ContainsIgnoreCase(value, substring)
 ```
 
 ---
 
 # Runtime String Table
 
-## Function
+Function:
 
 ```text
 FUN_1401fc0e0
 ```
 
-Recovered implementation:
+Recovered logic:
 
 ```c
 undefined8 *FUN_1401fc0e0(longlong *param_1, int param_2, int param_3)
@@ -458,8 +405,10 @@ undefined8 *FUN_1401fc0e0(longlong *param_1, int param_2, int param_3)
 
     if (param_2 == 0x11)
         base = param_1[3];
+
     else if (param_2 == 0x2b)
         base = *param_1;
+
     else
     {
         if (param_2 != 0x3b)
@@ -468,8 +417,9 @@ undefined8 *FUN_1401fc0e0(longlong *param_1, int param_2, int param_3)
         base = param_1[6];
     }
 
-    entry = (undefined8 *)
-        (base + (longlong)(param_3 / 0x15) * 0x20);
+    entry =
+        (undefined8 *)(base +
+        (longlong)(param_3 / 0x15) * 0x20);
 
     if (0xf < (ulonglong)entry[3])
         entry = (undefined8 *)*entry;
@@ -478,124 +428,117 @@ undefined8 *FUN_1401fc0e0(longlong *param_1, int param_2, int param_3)
 }
 ```
 
-For table type:
+For table:
 
 ```text
 0x3B
 ```
 
-the table base is:
-
-```text
-param_1[6]
-```
-
-which corresponds to:
+the base is:
 
 ```text
 context + 0x30
 ```
 
-Each table element occupies:
+Entries are:
 
 ```text
-0x20 bytes
+0x20 bytes each
+MSVC std::string-like layout
 ```
 
-and behaves like an MSVC `std::string`.
-
-The ID/index relationship is:
+Index relationship:
 
 ```text
 index = ID / 0x15
 ID    = index * 0x15
 ```
 
-Examples:
+Important recovered values include:
 
-| Index | ID | Value |
-| ---: | ---: | --- |
-| `0x74` | `0x984` | `HARDWARE\DESCRIPTION\System\CentralProcessor\0` |
-| `0x75` | `0x999` | `ProcessorNameString` |
-| `0x78` | `0x9D8` | Large recording / remote-control process list |
-| `0x79` | `0x9ED` | Accessibility / assistive-technology list |
-| `0x7D` | `0xA41` | `HARDWARE\DESCRIPTION\System\BIOS` |
-| `0x7E` | `0xA56` | `BaseBoardManufacturer` |
-| `0x7F` | `0xA6B` | `BaseBoardProduct` |
-| `0x80` | `0xA80` | `SystemProductName` |
-| `0x81` | `0xA95` | `Parallels` |
-| `0x82` | `0xAAA` | `FaceTime HD` |
+```text
+0x007E  ***remote***
+0x0093  ***shutdown***
+0x00A8  ***touchpadswipe***
+0x00BD  ***hacked***
+0x00D2  ***resedit*** {%s}
+0x00E7  ***vmdetected***
 
-A Frida-based runtime dump successfully recovered hundreds of plaintext strings from this table.
+0x01F8  CAMEYO_VIRTUALAPP,CAMEYO_RO_VIRTUALAPP,CAMEYO_RO_PROPERTY_VIRTUALAPP
+0x020D  VBoxAsw
+0x0222  PG splitter
+0x0237  TriDef
+0x0261  ALLOW_MONITOR
+
+0x03C6  Hacking program detected - (Discord2025) =
+0x03F0  SYSTEM\CurrentControlSet\Control\Terminal Server\
+0x0405  GlassSessionId
+0x041A  mstsc.exe
+```
+
+Additional table entries expose:
+
+```text
+VM Detected
+vm_device
+ProcessorNameString
+HARDWARE\DESCRIPTION\System\CentralProcessor\0
+Parallels
+FaceTime HD
+winex11.drv
+winepulse.drv
+```
 
 ---
 
-# Dynamic Runtime Tracing
+# Dynamic Instrumentation Findings
 
-Frida instrumentation was used to hook:
+Initial Frida work successfully exposed runtime string-table values and callsites.
 
-```text
-FUN_1401fc0e0
-```
+However, later testing showed a significant limitation.
 
-at runtime.
+## Direct Spawn
 
-This revealed live string-table lookups and their exact callsites.
-
-Observed runtime lookups included:
-
-| String ID | Runtime value | Caller |
-| ---: | --- | --- |
-| `0x999` | `ProcessorNameString` | `0x1402b6e6b` |
-| `0x984` | `HARDWARE\DESCRIPTION\System\CentralProcessor\0` | `0x1402b6e85` |
-| `0xB67` | ` BIOS: ` | `0x1402b3130` |
-| `0xB7C` | ` DEVICES: ` | `0x1402b36cf` |
-| `0x20D` | `VBoxAsw` | `0x1402b3a89` |
-| `0x20D` | `VBoxAsw` | `0x1402b3e3c` |
-| `0x1F8` | Cameyo environment list | `0x1402b5131` |
-| `0xCB7` | `winex11.drv` | `0x1402b52c9` |
-| `0xCB7` | `winex11.drv` | `0x1402b52e3` |
-| `0x46E` | Speech preferences registry path | `0x1402189d2` |
-| `0x483` | `VoiceActivationOn` | `0x1402189ec` |
-| `0x498` | `VoiceActivationEnableAboveLockscreen` | `0x140218a06` |
-| `0x6BA` | `WinSta0` | `0x140202d9b` |
-| `0x6CF` | `Sysinternals` | `0x1402227c0` |
-| `0x6E4` | `Default` | `0x1402227da` |
-| `0x6F9` | `Winlogon` | `0x1402227f4` |
-
-This establishes that these values are not merely dormant strings in the binary: they are actively retrieved during normal startup/environment inspection.
-
-## Important Negative Finding
-
-During the observed startup trace:
+Spawning Respondus through Frida caused startup/authentication failure:
 
 ```text
-ID 0x09D8
+Demo Auth 5 cannot be run because it is corrupted
 ```
 
-was **not** retrieved through `FUN_1401fc0e0`.
+Normal launch without Frida succeeded.
 
-This means the large recording/remote-control list may be:
+---
 
-- loaded through a different path,
-- parsed during another application phase,
-- retrieved only when a relevant policy is enabled,
-- copied during configuration initialization,
-- or consumed indirectly.
+## Delayed Attachment
 
-The table entry itself is confirmed, but its exact runtime consumer remains open.
+Attaching Frida after normal startup also caused instrumented Respondus processes to terminate shortly after hooks were loaded.
+
+The behavior persisted with different attachment delays.
+
+Therefore:
+
+> Respondus 2.1.5.01 exhibits instrumentation-sensitive behavior. Direct Frida spawning interferes with startup/authentication, while attachment to already-running processes causes instrumented processes to terminate shortly after hooks are installed.
+
+The research intentionally did not attempt to defeat this behavior.
+
+Subsequent analysis therefore relies more heavily on:
+
+```text
+static reconstruction
+runtime data already recovered
+external observation
+non-invasive tracing
+```
 
 ---
 
 # Device Enumeration
 
-## Function
+Primary function:
 
 ```text
 FUN_1402b30d0
 ```
-
-This is now one of the best-understood environment-detection functions in the analyzed build.
 
 Observed APIs include:
 
@@ -605,71 +548,50 @@ SetupDiEnumDeviceInfo
 SetupDiGetDeviceRegistryPropertyA
 ```
 
-The function retrieves at least:
+Properties inspected:
 
 ```text
-SPDRP_DEVICEDESC
-SPDRP_FRIENDLYNAME
+0x00 -> SPDRP_DEVICEDESC
+0x0C -> SPDRP_FRIENDLYNAME
 ```
 
-Specifically:
+Both are compared against a runtime-loaded device prefix array.
+
+The same function additionally performs:
 
 ```text
-Property 0x00 -> SPDRP_DEVICEDESC
-Property 0x0C -> SPDRP_FRIENDLYNAME
+system identity checks
+registry checks
+device inventory
+FNV hashing
+de-duplication
+diagnostic string construction
+persistent detection-state updates
 ```
-
-Both values are checked against a runtime-loaded VM/device detection prefix array.
-
-The same function also performs:
-
-- system identity checks,
-- registry-based VM checks,
-- device inventory collection,
-- diagnostic string construction,
-- device de-duplication,
-- and consolidated detection-flag updates.
 
 ---
 
-# Confirmed Device Detection Prefix List
+# Confirmed VM / Device Prefix Array
 
-The runtime structure:
-
-```text
-DAT_140cccba8 + 0x233d0
-```
-
-contains a pointer to the device detection prefix array.
-
-The count is stored at:
+Runtime pointer:
 
 ```text
-DAT_140cccba8 + 0x233d8
+DAT_140cccba8 + 0x233D0
 ```
 
-At runtime:
+Count:
 
 ```text
-Count = 26
+DAT_140cccba8 + 0x233D8
 ```
 
-These entries are compared against both:
+Observed:
 
 ```text
-SPDRP_DEVICEDESC
-SPDRP_FRIENDLYNAME
+26 entries
 ```
 
-using:
-
-```text
-FUN_140296900
-```
-
-which is a case-insensitive prefix matcher.
-
-The recovered list is:
+Recovered array:
 
 ```text
 [000] Parallels Video Driver
@@ -705,60 +627,26 @@ The recovered list is:
 [025] Wine USB
 ```
 
-This confirms direct device-level coverage for:
+These are tested against both:
 
-- Parallels
-- VMware
-- older VM Additions-style virtual hardware
-- VirtualBox
-- QEMU
-- Xen
-- Microsoft virtual devices
-- VirtIO / Red Hat virtualization
-- AWS virtual hardware
-- Wine virtual hardware
-
-## Simplified Device Matching Logic
-
-```c
-for each Windows device:
-{
-    description = SPDRP_DEVICEDESC;
-    friendly    = SPDRP_FRIENDLYNAME;
-
-    if (!StartsWithIgnoreCase(description, "VBoxAsw"))
-    {
-        for each VMDevicePrefix:
-        {
-            if (StartsWithIgnoreCase(description, VMDevicePrefix))
-                detected = true;
-        }
-    }
-
-    if (!StartsWithIgnoreCase(friendly, "VBoxAsw"))
-    {
-        for each VMDevicePrefix:
-        {
-            if (StartsWithIgnoreCase(friendly, VMDevicePrefix))
-                detected = true;
-        }
-    }
-}
+```text
+SPDRP_DEVICEDESC
+SPDRP_FRIENDLYNAME
 ```
+
+using the prefix comparator.
 
 ---
 
 # BIOS / Registry Detection Structure
 
-The runtime structure referenced through:
+Runtime structure:
 
 ```text
-DAT_140cccba8 + 0x233e0
+DAT_140cccba8 + 0x233E0
 ```
 
-was recovered in plaintext.
-
-Observed fields:
+Recovered values:
 
 ```text
 +0x00  HARDWARE\DESCRIPTION\System
@@ -776,43 +664,26 @@ Observed fields:
 +0x80  VRTUAL
 ```
 
-> `VRTUAL` is spelled exactly this way in the runtime data.
-
-Do not silently correct it to `VIRTUAL`.
+`VRTUAL` is spelled exactly that way in the recovered data.
 
 ---
 
-## Confirmed System Identity Checks
+# Confirmed Registry / Identity Checks
 
-A machine/system identity string at:
+## System Identity
 
-```text
-DAT_140ccc960 + 0x254
-```
-
-is tested against:
+Observed comparisons:
 
 ```text
-PRLS
-VBOX
-VRTUAL
-VMWare
-```
-
-Observed semantics:
-
-```text
-PRLS    -> case-insensitive prefix
-VBOX    -> case-insensitive prefix
-VRTUAL  -> case-insensitive prefix
-VMWare  -> case-insensitive substring
+PRLS    -> prefix
+VBOX    -> prefix
+VRTUAL  -> prefix
+VMWare  -> substring
 ```
 
 ---
 
-## Confirmed Registry Checks
-
-### Parallels / VirtualBox Video BIOS
+## Video BIOS
 
 Registry path:
 
@@ -833,11 +704,9 @@ Parallels
 Sun VirtualBox
 ```
 
-using prefix matching.
-
 ---
 
-### VMware System Manufacturer
+## VMware Manufacturer
 
 Registry path:
 
@@ -857,11 +726,9 @@ Compared against:
 VMWare
 ```
 
-using prefix matching.
-
 ---
 
-### QEMU CPU Identity
+## QEMU CPU Identity
 
 Registry path:
 
@@ -881,75 +748,63 @@ Compared against:
 QEMU
 ```
 
-using prefix matching.
-
 ---
 
-# `VBoxAsw` Special Handling
+# `VBoxAsw`
 
-A previous assumption was that:
+`VBoxAsw` was initially suspected to be another positive VirtualBox indicator.
 
-```text
-VBoxAsw
-```
+Tracing `FUN_1402b30d0` showed different behavior.
 
-was simply another positive VirtualBox detection prefix.
-
-Tracing `FUN_1402b30d0` showed that this is **not** what happens in this function.
-
-The actual logic is:
+Conceptually:
 
 ```c
-pattern = GetRuntimeString(0x20D); // "VBoxAsw"
-
-if (!StartsWithIgnoreCase(deviceString, pattern))
+if (!StartsWithIgnoreCase(deviceString, "VBoxAsw"))
 {
-    CheckGenericVMDevicePrefixList(deviceString);
+    CheckVMDevicePrefixList(deviceString);
 }
 ```
 
-Therefore, in `FUN_1402b30d0`:
+Within this function, `VBoxAsw` therefore acts as a:
 
 ```text
-VBoxAsw
+special-case exclusion
 ```
 
-acts as a **special-case exclusion from the generic device-prefix detection path**.
+from the generic VM prefix loop.
 
-It is actively retrieved once for device descriptions and once for friendly names.
-
-Observed runtime callsites:
+It is actively retrieved for both:
 
 ```text
-0x1402b3a89
-0x1402b3e3c
+device description processing
+friendly-name processing
 ```
 
-Because the comparison occurs once per enumerated device/property, the string appears repeatedly in Frida tracing.
-
-This finding corrects the earlier interpretation that `VBoxAsw` was itself necessarily a positive VM trigger.
-
-Its behavior in other functions, if any, has not yet been exhaustively mapped.
+This does not establish how `VBoxAsw` may be used elsewhere.
 
 ---
 
-# Device Inventory / FNV-1a De-Duplication
+# Device Inventory and FNV-1a
 
-`FUN_1402b30d0` also maintains a device inventory.
+The same detection routine maintains a de-duplicated device inventory.
 
-Device strings are hashed with FNV-1a 64-bit.
+Hash:
+
+```text
+FNV-1a 64-bit
+```
 
 Constants:
 
 ```text
-Offset basis:
+offset basis:
 0xCBF29CE484222325
 
-Prime:
+prime:
 0x100000001B3
 ```
 
-Equivalent operation:
+Equivalent:
 
 ```c
 hash = 0xCBF29CE484222325;
@@ -958,142 +813,88 @@ for each byte:
     hash = (hash ^ byte) * 0x100000001B3;
 ```
 
-The hash is used to check whether a device string has already been recorded.
-
-New values are appended to a diagnostic/inventory string at approximately:
+New device strings are stored in an inventory/diagnostic structure around:
 
 ```text
 DAT_140ccc948 + 0x46878
 ```
 
-This path appears to perform:
+This appears primarily related to:
 
 ```text
-device inventory
-+
+inventory
 de-duplication
-+
-diagnostic logging
+diagnostic reporting
 ```
 
-rather than act as the actual VM decision logic.
+rather than being the direct VM decision itself.
 
 ---
 
-# Consolidated Output of `FUN_1402b30d0`
+# Consolidated Environment State
 
-The accumulated result eventually reaches:
+`FUN_1402b30d0` ultimately ORs its result into:
 
-```c
-*(uint *)(DAT_140ccc948 + 0x46518) |= detected;
-*(uint *)(DAT_140ccc948 + 0x4651c) |= detected;
+```text
+DAT_140ccc948 + 0x46518
+DAT_140ccc948 + 0x4651C
 ```
 
-The function also increments:
+and increments:
 
 ```text
 DAT_140ccc948 + 0x46908
 ```
 
-The two fields:
+These fields appear to accumulate the outcome of:
 
 ```text
-+0x46518
-+0x4651c
+system identity checks
+BIOS checks
+registry checks
+device-description checks
+device-friendly-name checks
 ```
 
-are therefore high-value downstream detection-state targets.
+Scalar searches have not yet revealed an obvious direct reader for `+0x46518` or `+0x4651C`.
 
-They currently appear to hold or accumulate the result of:
-
-- system identity checks,
-- BIOS checks,
-- registry checks,
-- device-description checks,
-- device-friendly-name checks.
-
-The exact downstream consumer of these two fields remains a high-priority research target.
+Indirect or protected consumers remain possible.
 
 ---
 
-# Bluetooth Enumerator Check
+# COM FriendlyName Detection
 
-During device-description processing, Respondus explicitly compares against:
-
-```text
-Bluetooth Enumerator
-```
-
-and can set:
-
-```text
-*param_1 = 1
-```
-
-when the associated comparison succeeds.
-
-The exact higher-level meaning of this output parameter has not yet been fully mapped.
-
----
-
-# COM FriendlyName Enumeration
-
-## Function
+Function:
 
 ```text
 FUN_14023dda0
 ```
 
-This function:
-
-1. Calls `CoInitialize`
-2. Creates a COM object
-3. Enumerates objects
-4. Retrieves:
+Observed sequence:
 
 ```text
-FriendlyName
+CoInitialize
+COM enumeration
+FriendlyName extraction
+string conversion
+environment comparison
 ```
 
-5. Converts the value to a plaintext C string
-6. Applies environment-related string matching
-
-A runtime string lookup:
+Runtime string:
 
 ```text
 ID 0xAAA
-```
-
-resolves to:
-
-```text
 FaceTime HD
 ```
 
-The function performs:
+Observed behavior:
 
 ```c
 if (ContainsIgnoreCase(FriendlyName, "FaceTime HD"))
-    DAT_140ccc948[0x4653a] = 1;
+    state->0x4653A = 1;
 ```
 
-That flag later feeds:
-
-```text
-FUN_1402141b0
-```
-
-and can contribute to:
-
-```text
-DAT_140ccc948 + 0x4664a = 1
-```
-
-which maps to:
-
-```text
-rldbvm = "1"
-```
+This field later participates in `rldbvm=1`.
 
 A literal:
 
@@ -1101,203 +902,794 @@ A literal:
 virtual
 ```
 
-is also passed through the substring helper in the same routine.
+is also passed through the substring helper.
 
-In the analyzed decompile, that particular return value was not visibly consumed, so it should not yet be treated as a confirmed positive trigger.
+Its return value is not visibly consumed in the analyzed path, so it is not currently considered a confirmed detection trigger.
 
 ---
 
-# BIOS / Baseboard / System Product Inspection
+# `rldbvm=1`
 
-## Function
+Primary writer:
 
 ```text
 FUN_1402141b0
 ```
 
-This routine contains broader machine/platform classification.
-
-Recovered strings include:
+Field:
 
 ```text
-HARDWARE\DESCRIPTION\System\BIOS
-BaseBoardManufacturer
-BaseBoardProduct
-SystemProductName
-Parallels
-FaceTime HD
-Apple M1 Pro
+DAT_140ccc948 + 0x4664A
 ```
 
-The routine explicitly recognizes:
+The function processes broader machine/platform information.
+
+Observed behavior includes:
 
 ```text
-Apple M1 Pro
+Apple M1 Pro special-case handling
+machine/platform normalization
+table-based classification
+hardware/environment state
+COM-derived +0x4653A state
 ```
 
-using the case-insensitive prefix matcher.
-
-It also consumes machine/platform data and performs table-based classification.
-
-A boolean accumulator is ultimately ORed with:
+A Boolean classification result is ORed with:
 
 ```text
-DAT_140ccc948 + 0x4653a
++0x4653A
 ```
 
-and a positive result can set:
+and can result in:
 
 ```text
-DAT_140ccc948 + 0x4664a = 1
++0x4664A = 1
 ```
 
-which contributes to:
+which serializes as:
 
 ```text
-rldbvm = "1"
+rldbvm=1
 ```
 
-This supports the conclusion that `rldbvm=1` represents broader platform/environment classification rather than one simple `"Parallels detected"` condition.
+Current interpretation:
+
+> `rldbvm=1` represents broader hardware/platform classification rather than one simple VM vendor match.
 
 ---
 
-# Virtualization / Environment Indicators
+# `rldbvm=2`
 
-## Parallels
-
-Confirmed indicators include:
+Field:
 
 ```text
-PRLS
-Parallels
-Parallels Video Driver
-Parallels Network Adapter
-Parallels Mouse Synchronization Tool
-PRL Virtual CD-ROM
+DAT_140ccc948 + 0x4664B
 ```
 
-Observed detection surfaces include:
-
-- system identity
-- `VideoBiosVersion`
-- device description
-- device friendly name
-- broader hardware/platform classification
+Three independent writers have now been identified.
 
 ---
 
-## VMware
+## Writer 1 — Startup / Username Environment Check
 
-Confirmed indicators include:
+Function:
 
 ```text
-VMWare
-VMWare SVGA II
-VMWare SVGA
-VMWare Pointing Device
-VMWare Accelerated AMD PCNet Adapter
-VMWare SCSI Controller
-VMWare Virtual IDE Hard Drive
+FUN_14014e000
 ```
 
-Observed surfaces include:
+Observed sequence:
 
-- system identity substring matching
-- BIOS `SystemManufacturer`
-- device descriptions
-- device friendly names
+```c
+GetUserNameA(...);
+
+FUN_1402062d0(global, 8, ...);
+
+result = FUN_140296900(username, generated_string);
+```
+
+Because `FUN_140296900` returns:
+
+```text
+0 on prefix match
+non-zero on mismatch
+```
+
+the observed branch:
+
+```c
+if (result != 0)
+```
+
+corresponds to an apparent **prefix mismatch**, not a match.
+
+That branch writes:
+
+```text
++0x4664B = 1
++0x46650 = 1
+```
+
+The generated selector-8 string remains unresolved due heavy control-flow protection.
+
+This path therefore remains structurally confirmed but semantically unusual.
 
 ---
 
-## VirtualBox
+## Writer 2 — Process / Module Paths
 
-Confirmed indicators include:
+Function:
 
 ```text
-VBOX
-Sun VirtualBox
+FUN_140209e50
 ```
 
-and special handling for:
+This path generates:
 
 ```text
-VBoxAsw
+selector 8 pattern
+selector 10 pattern
 ```
 
-Observed surfaces include:
-
-- system identity
-- `VideoBiosVersion`
-- device prefixes
-
-`VBoxAsw` itself behaves as a special-case exclusion in the currently traced device-prefix routine.
-
----
-
-## QEMU
-
-Confirmed indicators include:
+and searches strings derived from:
 
 ```text
-QEMU
+K32GetModuleFileNameExA
 ```
 
-in both:
-
-- CPU `ProcessorNameString`
-- device-prefix matching
-
----
-
-## Xen
-
-Confirmed device prefix:
+Observed state writes:
 
 ```text
-XEN
+selector 8 found
+    -> +0x4664E = 1
+    -> +0x4664B = 1
+
+selector 10 found
+    -> +0x4664C = 1
+    -> +0x4664B = 1
+```
+
+This demonstrates that process/module path signatures can directly contribute to:
+
+```text
+rldbvm=2
 ```
 
 ---
 
-## Microsoft Virtual Devices
+## Writer 3 — Runtime Artifact Vector
 
-Confirmed prefix:
+Function:
 
 ```text
-Msft Virtual
+FUN_14023b5b0
+```
+
+Patterns:
+
+```text
+selector 8
+selector 9
+```
+
+The function scans a vector stored at:
+
+```text
+state + 0x464B0  begin
+state + 0x464B8  end
+state + 0x464C0  capacity
+```
+
+Record size:
+
+```text
+0x28 bytes
+```
+
+A searchable `std::string`-like object exists at:
+
+```text
+record + 0x08
+```
+
+Observed state writes:
+
+```text
+selector 8 found
+    -> +0x4664F = 1
+    -> +0x4664B = 1
+
+selector 9 found
+    -> +0x4664D = 1
+    -> +0x4664B = 1
 ```
 
 ---
 
-## VirtIO
-
-Confirmed prefix:
+# `rldbvm=2` Subflags
 
 ```text
-Red Hat VirtIO
+Process/module selector 8
+    -> +0x4664E
+
+Process/module selector 10
+    -> +0x4664C
+
+Runtime vector selector 8
+    -> +0x4664F
+
+Runtime vector selector 9
+    -> +0x4664D
+```
+
+This symmetry strongly suggests a correlated environment signature distributed across multiple artifact types.
+
+Current interpretation:
+
+> `rldbvm=2` represents recognition of a software/runtime environment through correlated artifacts rather than generic virtual hardware.
+
+The exact environment represented by selectors `8`, `9`, and `10` remains unresolved.
+
+---
+
+# Runtime Artifact Vector
+
+The vector used by the third `rldbvm=2` writer is initialized empty in:
+
+```text
+FUN_14024e040
+```
+
+Constructor initialization:
+
+```text
++0x464B0 = 0
++0x464B8 = 0
++0x464C0 = 0
+```
+
+A later routine:
+
+```text
+FUN_14023f4a0
+```
+
+passes this vector to:
+
+```text
+FUN_140226710
+```
+
+indicating that the latter populates or updates the collection.
+
+---
+
+## Periodic Refresh
+
+`FUN_14023f4a0` is called from a periodic scheduler in:
+
+```text
+FUN_1402c6950
+```
+
+A counter at:
+
+```text
++0x41FC
+```
+
+is decremented.
+
+When it reaches zero:
+
+```text
+FUN_14023f4a0()
+```
+
+is invoked and the counter is reset to:
+
+```text
+0x546
+1350 decimal
+```
+
+The scheduler tick duration is not yet known, so this should not be converted into seconds.
+
+This establishes that the artifact vector is periodically refreshed.
+
+---
+
+# Shared VM2 / Hack Detection Artifact Collection
+
+The same `0x28`-byte record collection is used for more than VM classification.
+
+Inside:
+
+```text
+FUN_14023b5b0
+```
+
+the vector is also scanned against another pattern and can set:
+
+```text
+state + 0x2D5 = 1
+```
+
+which serializes as:
+
+```text
+rldbdetect=4
+```
+
+Observed log string:
+
+```text
+PTC 4,1 - Hack type 4 detection - ...
+```
+
+Therefore:
+
+> The vector contains named runtime artifacts that participate in both environment classification and general hack/tamper detection.
+
+The exact artifact type remains unresolved.
+
+Possible interpretations include:
+
+```text
+window-derived objects
+runtime object names
+application artifacts
+enumerated UI/process-related records
+```
+
+but none has yet been confirmed.
+
+---
+
+# `rldbdetect=4`
+
+Internal field:
+
+```text
++0x2D5
+```
+
+Serialized value:
+
+```text
+4
+```
+
+Two detection paths have been reconstructed.
+
+---
+
+## PTC 4,1
+
+The runtime artifact vector is searched against a pattern.
+
+On match:
+
+```text
++0x2D5 = 1
+```
+
+and a diagnostic string identifies:
+
+```text
+Hack type 4 detection
 ```
 
 ---
 
-## AWS Virtual Hardware
+## PTC 4,2
 
-Confirmed prefixes include:
+A second path uses a different signature collection.
+
+Structure:
 
 ```text
-Amazon Elastic Network Adapter
-Amazon Outbound Audio
-AWS Virtual Camera
-AWS Virtual DOD Driver
-AWS Virtual Microphone Device
+state + 0x3F0 -> array of C-string pointers
+state + 0x3F8 -> count
 ```
 
-This demonstrates explicit AWS virtual-hardware awareness beyond a generic network-adapter check.
+For each pattern:
+
+```text
+strlen
+manual search
+memcmp
+```
+
+are used against a larger buffer.
+
+Match offsets are recorded.
+
+The function then evaluates:
+
+```text
+missing pattern count
++
+ordering failures
+```
+
+The final test is:
+
+```c
+if (missing_patterns + ordering_failures < 4)
+    state->0x2D5 = 1;
+```
+
+and logs:
+
+```text
+PTC 4,2 - Hack type 4 detection ...
+```
+
+This suggests a signature sequence detector where sufficiently complete and correctly ordered evidence triggers code `4`.
 
 ---
 
-## Wine
+## Latching Behavior
 
-Confirmed device prefixes:
+The same function checks:
+
+```asm
+CMP byte ptr [state+0x2D5],0
+JNZ ...
+```
+
+before re-running the detector.
+
+Therefore:
+
+```text
++0x2D5
+```
+
+is latched once set.
+
+This is duplicate-suppression / persistent state rather than direct proof of enforcement.
+
+---
+
+# `rldbvm=3`
+
+Field:
+
+```text
+DAT_140ccc948 + 0x46538
+```
+
+Writer:
+
+```text
+FUN_14020fb20
+```
+
+A device-expectation structure is stored around:
+
+```text
++0x46630
++0x46638
+```
+
+Record size:
+
+```text
+0x28
+```
+
+Recovered rules:
+
+```text
+Rule 3
+Expected: 1
+Mode: ANY
+Patterns:
+    graphics
+    nvidia
+    amd
+    matrox
+     arc
+
+Rule 4
+Expected: 1
+Mode: ANY
+Pattern:
+    PCI Express Root
+```
+
+During device enumeration:
+
+```text
+SPDRP_DEVICEDESC
+```
+
+is searched using the case-insensitive substring helper.
+
+Observed logic compares the actual result against the expected result.
+
+A mismatch count is accumulated.
+
+When:
+
+```text
+mismatchCount > 1
+```
+
+the function sets:
+
+```text
++0x46538 = 1
+```
+
+which serializes as:
+
+```text
+rldbvm=3
+```
+
+Because two rules are currently present, this effectively requires both rules to disagree with expectation.
+
+Current interpretation:
+
+> `rldbvm=3` is a device-consistency classification based on expected presence of generic display and PCI-root style hardware indicators.
+
+---
+
+# VM Classification Serialization
+
+Another function:
+
+```text
+FUN_1402528a0
+```
+
+serializes VM categories into a semicolon-delimited representation.
+
+Observed behavior includes:
+
+```text
++0x4664B -> append "2;"
++0x46538 -> append "3;"
+```
+
+with surrounding code strongly suggesting:
+
+```text
++0x4664A -> "1;"
+```
+
+This is consistent with telemetry/status serialization.
+
+---
+
+# Important Reader Finding
+
+Direct scalar reads of:
+
+```text
++0x4664B
+```
+
+were found in:
+
+```text
+FUN_1401ea670
+FUN_1402528a0
+```
+
+The observed behavior in those functions is:
+
+```text
+telemetry serialization
+status serialization
+```
+
+No direct consumer has yet been identified where:
+
+```text
++0x4664B == 1
+```
+
+immediately causes a termination or other enforcement action.
+
+This is an important distinction:
+
+> A confirmed VM classification flag is not automatically equivalent to a confirmed enforcement decision.
+
+---
+
+# Recording / Remote-Control Process Table
+
+Runtime entry:
+
+```text
+ID 0x09D8
+```
+
+contains a large list of applications associated with:
+
+```text
+remote control
+remote desktop
+screen recording
+capture
+streaming
+support software
+```
+
+Examples include:
+
+```text
+AnyDesk.exe
+OBS.exe
+obs64.exe
+ShareX.exe
+TeamViewer.exe
+vncviewer.exe
+Wirecast.exe
+XSplit.Gamecaster.exe
+mstsc.exe
+quickassist.exe
+```
+
+The table is confirmed to exist.
+
+It was **not** observed being retrieved through `FUN_1401fc0e0` during the startup trace.
+
+Possible explanations include:
+
+```text
+different retrieval mechanism
+policy-conditional loading
+initialization-time copying
+later-phase consumption
+indirect table access
+```
+
+Its exact consumer remains unresolved.
+
+---
+
+# Accessibility Software Table
+
+Runtime entry:
+
+```text
+ID 0x09ED
+```
+
+contains software including:
+
+```text
+Dragon
+NVDA
+JAWS
+ZoomText
+```
+
+Examples:
+
+```text
+dragonbar.exe
+natspeak.exe
+nvda.exe
+jfw.exe
+AiSquared.ZoomText.UI.exe
+```
+
+This table is confirmed to exist.
+
+It should **not** currently be described as a blacklist.
+
+Possible uses include:
+
+```text
+compatibility handling
+exceptions
+special-case behavior
+monitoring
+policy
+blocking
+```
+
+The consumer remains unresolved.
+
+---
+
+# Browser Process Indicators
+
+Recovered process names include:
+
+```text
+chrome.exe
+firefox.exe
+msedge.exe
+brave.exe
+safari.exe
+opera.exe
+vivaldi.exe
+wavebrowser.exe
+ghost.exe
+```
+
+Nearby configuration:
+
+```text
+BlockBrowsers
+```
+
+supports browser-specific policy logic.
+
+---
+
+# Remote Desktop / Session Detection
+
+Recovered values:
+
+```text
+SYSTEM\CurrentControlSet\Control\Terminal Server\
+GlassSessionId
+mstsc.exe
+WinSta0
+```
+
+Imports include:
+
+```text
+WTSRegisterSessionNotification
+WTSUnRegisterSessionNotification
+WTSGetActiveConsoleSessionId
+ProcessIdToSessionId
+```
+
+This confirms explicit Windows-session and RDP awareness.
+
+---
+
+# Sysinternals / Desktop Handling
+
+Runtime lookups:
+
+```text
+Sysinternals
+Default
+Winlogon
+```
+
+Known callsites:
+
+```text
+0x1402227C0
+0x1402227DA
+0x1402227F4
+```
+
+Associated diagnostic string:
+
+```text
+Hacked Sysinternals Desktops in use
+```
+
+The grouping of:
+
+```text
+Sysinternals
+Default
+Winlogon
+```
+
+suggests desktop/window-station inspection rather than simply checking for Sysinternals executables.
+
+The full mechanism remains under investigation.
+
+---
+
+# Wine Detection
+
+Confirmed device indicators:
 
 ```text
 Wine HID
@@ -1312,562 +1704,62 @@ winex11.drv
 winepulse.drv
 ```
 
-Live lookup of:
+`winex11.drv` was actively retrieved at:
 
 ```text
-winex11.drv
+0x1402B52C9
+0x1402B52E3
 ```
 
-was observed from:
-
-```text
-0x1402b52c9
-0x1402b52e3
-```
-
-The exact enforcement result of those driver checks remains under investigation.
+The resulting state transition has not yet been completely reconstructed.
 
 ---
 
-## Cameyo
+# Cameyo Detection
 
-Recovered runtime value:
-
-```text
-CAMEYO_VIRTUALAPP,CAMEYO_RO_VIRTUALAPP,CAMEYO_RO_PROPERTY_VIRTUALAPP
-```
-
-Live consumer:
+Runtime value:
 
 ```text
-0x1402b5131
+CAMEYO_VIRTUALAPP,
+CAMEYO_RO_VIRTUALAPP,
+CAMEYO_RO_PROPERTY_VIRTUALAPP
 ```
 
-These are associated with application virtualization.
+Observed consumer:
+
+```text
+0x1402B5131
+```
+
+These values correspond to application virtualization indicators.
+
+The exact source being queried remains unresolved.
 
 ---
 
-## Older VM Additions Indicators
+# Speech / Voice Activation
 
-Confirmed prefixes:
-
-```text
-VM Additions S3 Trio32/64
-VM Additions PS/2 Port Mouse
-VM Additions PC/AT Enhanced PS/2 Keyboard
-```
-
----
-
-## Other VM-Related Values
-
-Recovered values include:
-
-```text
-***vmdetected***
-VM Detected
-vm_device
-moosevm
-VRTUAL
-```
-
-The exact consumers for all of these have not yet been fully mapped.
-
----
-
-# Important Runtime Strings
-
-Recovered values include:
-
-```text
-***remote***
-***shutdown***
-***touchpadswipe***
-***hacked***
-***resedit*** {%s}
-***vmdetected***
-
-VBoxAsw
-PG splitter
-TriDef
-
-ALLOW_MONITOR
-BlockRecording
-AllowRecording
-AllowCapture
-BlockAll
-BlockBrowsers
-BlockMirrors
-DetectUnsigned
-BlockSplitters
-BlockTeramind
-AllowGameBar
-AllowCopyPaste
-
-ldbhackapp
-moosevm
-vm_device
-
-Sysinternals
-PROGRAM HACKED OR INFECTED
-AUTOLAUNCH SHIM DETECTED
-FRGND CHECK TMPR
-KEYBOARD HOOK REMOVED
-ADMIN RIGHTS REMOVED
-
-Hacked Sysinternals Desktops in use
-Blocklisted process hacked to prevent detection %s = %s
-Detected recording or capture file = %s
-Core Mismatch Moose - %s %d
-Hacking program detected - %s
-MonitorPrestartComplete
-
-VM Detected
-Parallels
-FaceTime HD
-
-winex11.drv
-winepulse.drv
-
-CANARY
-```
-
-A recovered string by itself does **not** prove how it is enforced.
-
-Where possible, this repository distinguishes:
-
-```text
-string exists
-```
-
-from:
-
-```text
-string is actively consumed
-```
-
-and:
-
-```text
-string is confirmed to cause a particular detection state
-```
-
----
-
-# Recording / Remote-Control / Capture Process List
-
-Runtime entry:
-
-```text
-index: 0x78
-ID:    0x09D8
-```
-
-Recovered plaintext list:
-
-```text
-ActionsServer.exe
-apc_Admin.exe
-apc_host.exe
-AceThinker Screen Grabber Pro.exe
-Apowersoft Screen Recorder Pro 2.exe
-AnyDesk.exe
-AVSScreenCapture.exe
-AVSVideoEditor.exe
-AVCUltimate.exe
-ActivePresenter.exe
-AweSun.exe
-bomgar-scc.exe
-BASupApp.exe
-CrossLoopConnect.exe
-CrossLoopService.exe
-CoScreen.exe
-Debut.exe
-deskin_service.exe
-deskin.exe
-DeskIn_Session.exe
-dwagsvc.exe
-dwaglnc.exe
-dwagent.exe
-Filmora.exe
-FSRecorder.exe
-FSEditor.exe
-FreeOnlineScreenRecorder.exe
-g2svc.exe
-g2comm.exe
-Gameshow.exe
-Gyazowin.exe
-GyazoGIF.exe
-GyazoReplay.exe
-GyStation.exe
-getscreen.exe
-IgRemote.exe
-IperiusRemote_2.exe
-join.me.exe
-JumpConnect.exe
-Kaltura Capture.exe
-LogMeIn.exe
-LogiCapture.exe
-Loom.exe
-mnmsrvc.exe
-mstsc.exe
-MSOSREC.EXE
-mdrserv.exe
-Mikogo-host.exe
-MingleStream.exe
-Mingleview.exe
-ncscc.exe
-NetChat.exe
-NetCtl.exe
-NetServ.exe
-Nimbus Capture.exe
-nxclient.exe
-nxserver.exe
-nxd.exe
-nxnode.exe
-nxserver64.exe
-nxserver32.exe
-OBS.exe
-obs64.exe
-obs32.exe
-psr.exe
-Parsecd.exe
-quickshot.exe
-quickassist.exe
-ROMServer.exe
-RPAccess.exe
-RPAccessHS.exe
-RCPServer.exe
-remoting_desktop.exe
-RemotePCDesktop.exe
-RemotePCUIU.exe
-RemotePCBlackScreenApp.exe
-RemotePCService.exe
-RPCPerfViewer.exe
-RServer3.exe
-RPCSetup.exe
-RPCPerformanceService.exe
-recorder.exe
-record.exe
-RelayRecorder.exe
-RoyalTS.exe
-RemotixAgentService.exe
-ReplayVideo.exe
-rutserv.exe
-RpcDND_Console.exe
-SRServer.exe
-SRService.exe
-ScreenConnect.WindowsClient.exe
-ScreenCapture.exe
-ShareX.exe
-ScreenRecorder.exe
-screen_recorder.exe
-Screenleap.exe
-ScnRec.exe
-spcplink.exe
-TeamViewer.exe
-tvnserver.exe
-tvnviewer.exe
-TiClientCore.exe
-TurboMeeting.exe
-UltraViewer_Desktop.exe
-vncviewer.exe
-vncagent.exe
-vncserver.exe
-virola_client_win.exe
-voovmeetingapp.exe
-Win2VNC.exe
-WinVNC.exe
-WinVNC4.exe
-WinSSHD.exe
-WiSSH.exe
-Wirecast.exe
-XSplit.Gamecaster.exe
-XSplit.Core.exe
-XSplit.xgcbp.exe
-YuuGuu.exe
-zoho.exe
-AllowRecording
-```
-
-The contents strongly correlate with:
-
-- remote administration
-- remote desktop
-- screen recording
-- screen capture
-- streaming
-- video capture
-- support/control tools
-
-A nearby runtime string states:
-
-```text
-Detected recording or capture file = %s
-```
-
-> [!CAUTION]
-> The list is confirmed.
->
-> It has **not yet been proven that every individual entry is always an unconditional hard block**.
->
-> The exact consumer of runtime ID `0x09D8` remains under investigation.
-
----
-
-# Accessibility / Assistive Technology List
-
-Runtime entry:
-
-```text
-index: 0x79
-ID:    0x09ED
-```
-
-Recovered list:
-
-```text
-dragonbar.exe
-natspeak.exe
-dgnuiasvr_x64.exe
-dgnsvc.exe
-dgnuiasvr.exe
-nvda.exe
-nvdaHelperRemoteLoader.exe
-jfw.exe
-FSOcrServer.exe
-VoiceAssistant.exe
-AccEventCacheLoader.exe
-jhookldr.exe
-fsSynth32.exe
-Zt.exe
-ZtUac.exe
-AiSquared.Magnification.Service.exe
-AiSquared.ZoomText.UI.exe
-QuickAccessBar.exe
-AiSquared.Loader.Elevated.exe
-ProtectedUI.exe
-ZtOff.exe
-AiSquared.Magnification.ZoomText.exe
-ztVoice32.exe
-```
-
-This includes software associated with:
-
-- Dragon
-- NVDA
-- JAWS
-- ZoomText
-
-> [!WARNING]
-> This table should **not currently be labeled a blacklist**.
-
-Possible purposes include:
-
-- accessibility exceptions
-- compatibility handling
-- special-case handling
-- allowlisting
-- detection
-
-The exact consumer remains open.
-
----
-
-# Browser Blocking List
-
-Recovered values include:
-
-```text
-chrome.exe
-firefox.exe
-msedge.exe
-brave.exe
-safari.exe
-opera.exe
-vivaldi.exe
-wavebrowser.exe
-ghost.exe
-```
-
-Nearby policy string:
-
-```text
-BlockBrowsers
-```
-
-This strongly suggests browser-process blocking.
-
----
-
-# Standalone Process / Application Indicators
-
-Recovered process/application values include:
-
-```text
-mstsc.exe
-lsynchost.exe
-unlocker.exe
-teas helpers.exe
-svchost.exe
-tmagentsvc.exe
-AlertusDesktopAlert.exe
-```
-
-Associated strings include:
-
-```text
-BlockTeramind
-Hacking program detected - %s
-Hacking program detected - (Discord2025) =
-Blocklisted process hacked to prevent detection %s = %s
-Unclosed app %s
-Second Process List:
-```
-
-The exact behavior associated with every standalone value has not yet been mapped.
-
----
-
-# Remote Desktop / Session Checks
-
-Recovered values include:
-
-```text
-SYSTEM\CurrentControlSet\Control\Terminal Server\
-GlassSessionId
-mstsc.exe
-WinSta0
-```
-
-Relevant imports include:
-
-```text
-WTSRegisterSessionNotification
-WTSUnRegisterSessionNotification
-WTSGetActiveConsoleSessionId
-ProcessIdToSessionId
-```
-
-This confirms explicit Windows session-awareness and RDP-related handling.
-
----
-
-# Sysinternals Handling
-
-Recovered strings include:
-
-```text
-Sysinternals
-Hacked Sysinternals Desktops in use
-```
-
-Dynamic tracing additionally showed a cluster of runtime lookups:
-
-```text
-0x1402227c0 -> Sysinternals
-0x1402227da -> Default
-0x1402227f4 -> Winlogon
-```
-
-Because:
-
-```text
-Default
-Winlogon
-Sysinternals
-```
-
-are retrieved together, this appears more consistent with Windows desktop/window-station enumeration or desktop classification than with a simple `"block every Sysinternals executable"` process check.
-
-The nearby string:
-
-```text
-Hacked Sysinternals Desktops in use
-```
-
-further supports that interpretation.
-
-The containing function still requires complete static tracing before the exact detection semantics are stated.
-
----
-
-# Recording / Capture Controls
-
-Recovered configuration names include:
-
-```text
-BlockRecording
-AllowRecording
-AllowCapture
-BlockAll
-BlockMirrors
-BlockSplitters
-```
-
-Recovered filesystem-related values include:
-
-```text
-%USERPROFILE%\Videos\Captures
-Screenshots
-```
-
-Recovered log string:
-
-```text
-Detected recording or capture file = %s
-```
-
-Together, these support both:
-
-- process/application-based capture monitoring
-- filesystem/output-artifact monitoring
-
----
-
-# Windows Game Bar / Capture Handling
-
-Recovered values include:
-
-```text
-AllowGameBar
-%USERPROFILE%\Videos\Captures
-Screenshots
-AllowCapture
-```
-
-This indicates explicit handling of Windows capture/Game Bar behavior.
-
----
-
-# Speech / Voice Activation Checks
-
-Recovered registry path:
+Confirmed runtime values:
 
 ```text
 SOFTWARE\Microsoft\Speech_OneCore\Preferences
-```
-
-Recovered values:
-
-```text
 VoiceActivationOn
 VoiceActivationEnableAboveLockscreen
 ```
 
-Dynamic runtime consumers:
+Observed consumers:
 
 ```text
-0x1402189d2 -> registry path
-0x1402189ec -> VoiceActivationOn
-0x140218a06 -> VoiceActivationEnableAboveLockscreen
+0x1402189D2
+0x1402189EC
+0x140218A06
 ```
 
-This confirms that these values are actively inspected at runtime.
+This confirms explicit runtime inspection of Windows speech/voice activation preferences.
 
 ---
 
-# Process Enumeration Capability
+# Process / Module Enumeration
 
 Relevant imports include:
 
@@ -1890,11 +1782,11 @@ QueryFullProcessImageNameA
 QueryFullProcessImageNameW
 ```
 
-These imports confirm extensive user-mode process/module inspection capability.
+These confirm extensive process and module inspection capability.
 
 ---
 
-# Service Enumeration Capability
+# Service Inspection
 
 Relevant imports include:
 
@@ -1912,50 +1804,7 @@ QueryServiceStatusEx
 StartServiceW
 ```
 
-These confirm Windows service enumeration and inspection capability.
-
-The complete service-related detection list has not yet been recovered.
-
----
-
-# Registry Inspection
-
-Relevant imports include:
-
-```text
-RegOpenKeyA
-RegOpenKeyExA
-RegQueryValueExA
-RegCreateKey*
-RegSetValue*
-RegDelete*
-```
-
-Confirmed or recovered registry targets include:
-
-```text
-HARDWARE\DESCRIPTION\System
-
-HARDWARE\DESCRIPTION\System\BIOS
-
-HARDWARE\DESCRIPTION\System\CentralProcessor\0
-
-SYSTEM\CurrentControlSet\Control\Terminal Server\
-
-SYSTEM\CurrentControlSet\services\MainLSyncHost
-
-SOFTWARE\Microsoft\Speech_OneCore\Preferences
-```
-
-Known queried values include:
-
-```text
-VideoBiosVersion
-SystemManufacturer
-ProcessorNameString
-VoiceActivationOn
-VoiceActivationEnableAboveLockscreen
-```
+The complete service-related detection set has not yet been recovered.
 
 ---
 
@@ -1971,59 +1820,51 @@ GetTickCount
 GetTickCount64
 ```
 
-These establish debugger/timing-inspection capability.
+These confirm debugger/timing inspection capability.
 
-Their precise use in VM detection or anti-tamper logic has not yet been fully traced.
+Exact use within anti-debug or anti-tamper logic remains unresolved.
 
 ---
 
-# Main DLL Findings
+# Main DLL
 
-`LockDownBrowser.dll` imports APIs related to:
+`LockDownBrowser.dll` contains functionality associated with:
 
-- input handling
-- hooks
-- debugging
-- process memory
-- Windows UI interaction
+```text
+hooks
+Windows UI interaction
+input handling
+process memory
+debugging-related APIs
+```
 
-No obvious plaintext VM vendor list was recovered from the DLL comparable to the runtime VM/device structures found in the executable.
+No plaintext VM vendor table comparable to the executable's runtime structures has been recovered from the DLL.
 
-Current evidence suggests that much of the high-level environment classification is concentrated in:
+Current evidence suggests that high-level environment classification is concentrated primarily in:
 
 ```text
 LockDownBrowser.exe
 ```
 
-while the DLL appears more focused on hook/browser behavior.
-
 ---
 
 # Kernel Driver
 
-## Driver Information
+Driver:
 
-| Property | Value |
-| --- | --- |
-| **Driver** | `LockDownService215.sys` |
-| **Version** | `2.15.0.1` |
-| **SHA256** | `323FAE10C53E74C2418C8D1BD45E54DE63241135BEB81196FDA0F6A16C3D5996` |
-| **Service name** | `LockDownService215` |
-| **Driver type** | `FILE_SYSTEM_DRIVER` |
-| **Start type** | `SYSTEM_START` |
-| **Filter class** | `FSFilter Bottom` |
-| **Observed altitude** | `47777` |
-| **Observed instances** | `4` |
-| **Observed frame** | `0` |
-| **Dependency** | `FltMgr` |
+```text
+LockDownService215.sys
+```
 
-The driver was observed running as a Windows filesystem minifilter.
+Observed role:
+
+```text
+Windows filesystem minifilter
+```
 
 ---
 
-# Driver FLTMGR Capabilities
-
-Relevant imports include:
+## FLTMGR Imports
 
 ```text
 FltRegisterFilter
@@ -2032,18 +1873,20 @@ FltCreateCommunicationPort
 FltSendMessage
 ```
 
-These confirm capability for:
+These establish capability for:
 
-- minifilter registration
-- filesystem filtering
-- communication-port creation
-- user/kernel message passing
+```text
+filesystem filtering
+filter registration
+communication-port creation
+kernel/user messaging
+```
 
 ---
 
-# Driver Process / Thread / Image Monitoring
+## Kernel Monitoring
 
-Observed kernel imports include:
+Observed callbacks:
 
 ```text
 PsSetCreateProcessNotifyRoutineEx
@@ -2051,36 +1894,40 @@ PsSetCreateThreadNotifyRoutine
 PsSetLoadImageNotifyRoutine
 ```
 
-These confirm kernel-mode capability to monitor:
+This gives the driver visibility into:
 
-- process creation
-- thread creation
-- image/module loading
+```text
+process creation
+thread creation
+image/module loading
+```
 
-The driver therefore has visibility extending beyond ordinary filesystem filtering.
+in addition to filesystem activity.
 
 ---
 
-# Driver Cryptographic Capabilities
+## Driver Cryptography
 
-Observed CNG imports indicate functionality related to:
-
-- hashing
-- symmetric-key operations
-- encryption
-- decryption
-- key-pair operations
-- key import/export
-- random generation
-
-The following remain unconfirmed:
+CNG imports indicate support for:
 
 ```text
-exact AES mode
-exact AES key size
-exact RSA key size
-exact protocol framing
-exact encrypted message contents
+hashing
+symmetric crypto
+encryption
+decryption
+key import/export
+key-pair operations
+random generation
+```
+
+Not yet confirmed:
+
+```text
+algorithm parameters
+key sizes
+protocol structure
+message authentication format
+encrypted payload semantics
 ```
 
 ---
@@ -2095,53 +1942,346 @@ CreateFileW
 DeviceIoControl
 ```
 
-The driver imports:
+Driver-side functionality includes:
 
 ```text
 FltCreateCommunicationPort
 FltSendMessage
 ```
 
-This strongly indicates a dedicated user/kernel communication protocol.
+This establishes communication capability between the browser/service components and the kernel driver.
 
-The exact protocol remains unmapped.
+The exact protocol is not yet mapped.
 
-Open questions include:
-
-- which component initiates the channel,
-- message structure,
-- command IDs,
-- event types,
-- whether the executable uses IOCTLs directly,
-- what is sent over the minifilter communication port,
-- whether cryptographic functionality protects or authenticates messages.
-
----
-
-# Tamper / Integrity Strings
-
-Recovered strings include:
+High-value unanswered questions include:
 
 ```text
-PROGRAM HACKED OR INFECTED
-AUTOLAUNCH SHIM DETECTED
-KEYBOARD HOOK REMOVED
-ADMIN RIGHTS REMOVED
-Blocklisted process hacked to prevent detection %s = %s
-Early Exit - Sending to AWS
-FRGND CHECK TMPR
+device object / channel names
+IOCTL values
+input/output buffer layouts
+command IDs
+driver event IDs
+which operations use IOCTL
+which operations use minifilter ports
+whether messages are authenticated/encrypted
 ```
 
-These indicate integrity/tamper monitoring separate from ordinary VM and application detection.
+This is currently one of the highest-value remaining research targets.
 
 ---
 
-# Policy / Configuration Names
+# Obfuscated Control Flow
+
+A heavily protected region around:
+
+```text
+FUN_1402149b0
+FUN_140214f16
+FUN_140215029
+```
+
+was manually reconstructed.
+
+This analysis revealed that Ghidra's ordinary function boundaries are frequently misleading in these regions.
+
+Observed protection techniques include:
+
+```text
+overlapping instruction streams
+RET gadgets embedded inside instruction immediates
+opaque arithmetic predicates
+synthetic return stacks
+stack-manipulated control transfer
+computed JMP targets
+small arithmetic gadgets
+fake/no-op functions
+```
+
+---
+
+# One-Shot State `+0x466F4`
+
+A scheduler checks:
+
+```text
+state + 0x466F4
+```
+
+before calling:
+
+```text
+FUN_1402149b0
+```
+
+The routine immediately performs:
+
+```c
+state->0x466F4 = 1;
+```
+
+Therefore:
+
+> `+0x466F4` is currently best understood as a one-shot / re-entry latch for this protected routine.
+
+It should **not** currently be labeled an enforcement flag.
+
+---
+
+# Dead / No-Op Functions
+
+Several apparent functions encountered during this analysis are simply:
+
+```asm
+RET
+```
+
+Examples include:
+
+```text
+FUN_140213350
+FUN_140216418
+FUN_140217cb0
+```
+
+These appear to participate in protected/obfuscated control flow rather than perform meaningful application logic.
+
+---
+
+# Synthetic Return / Gadget Example
+
+One protected dispatcher eventually performs:
+
+```text
+JMP 0x1402111F4
+```
+
+where:
+
+```asm
+1402111F4  CLC
+1402111F5  RET
+```
+
+The return does not follow a conventional call stack.
+
+Instead, the dispatcher constructs a synthetic sequence of addresses on the stack.
+
+Observed gadgets included:
+
+```asm
+CLC
+RET
+```
+
+```asm
+MOV EAX,0x01EB0603
+RET
+```
+
+```asm
+MOV EAX,0x01EB0633
+RET
+```
+
+```asm
+XOR AL,0xF8
+RET
+```
+
+```asm
+ADD AL,0x8B
+RET
+```
+
+```asm
+AND AL,0xF8
+RET
+```
+
+as well as additional arithmetic gadgets.
+
+These collectively manipulate register and flag state before returning into another protected continuation.
+
+---
+
+# Overlapping Instructions
+
+One particularly clear example occurs around:
+
+```text
+0x140215E6F
+```
+
+Normal disassembly produces:
+
+```asm
+MOV dword ptr [RSP+...],0xC39B7A76
+```
+
+The final byte of the immediate constant is:
+
+```text
+C3
+```
+
+which is the opcode for:
+
+```asm
+RET
+```
+
+A protected call directly targets that byte:
+
+```text
+0x140215E76
+```
+
+causing execution to interpret the byte as:
+
+```asm
+RET
+```
+
+rather than as part of the surrounding immediate.
+
+This confirms deliberate use of:
+
+> overlapping instruction streams where bytes inside otherwise valid instructions are separately executed as control-flow gadgets.
+
+---
+
+# Opaque Predicates
+
+Multiple protected paths use predicates equivalent to:
+
+```c
+x * (x - 1)
+```
+
+followed by:
+
+```text
+test low bit
+conditional branch
+```
+
+Because the product of consecutive integers is always even, the low bit is always zero.
+
+Example pattern:
+
+```asm
+MOV  EAX,[...]
+LEA  ECX,[EAX-1]
+IMUL ECX,EAX
+TEST CL,1
+JNZ  ...
+```
+
+The branch is therefore mathematically impossible under ordinary integer semantics.
+
+These predicates appear designed to confuse static analysis and decompilation.
+
+---
+
+# Control-Flow Analysis Conclusion
+
+The protected region around:
+
+```text
+FUN_1402149b0
+```
+
+was investigated far enough to establish the protection methodology.
+
+Continuing the gadget chain byte-by-byte produced diminishing returns because substantial effort was being spent reconstructing:
+
+```text
+dispatcher machinery
+integrity arithmetic
+opaque control flow
+```
+
+rather than Respondus application semantics.
+
+The analysis therefore pivoted toward higher-value areas:
+
+```text
+observable policy state
+VM classification writers
+detection consumers
+driver communication
+Windows APIs with direct effects
+```
+
+---
+
+# `"VM allowed - skipping"`
+
+Recovered string:
+
+```text
+VM allowed - skipping
+```
+
+Address:
+
+```text
+0x140B28698
+```
+
+Ghidra reported:
+
+```text
+no direct references
+```
+
+A search for the literal 64-bit pointer:
+
+```text
+98 86 B2 40 01 00 00 00
+```
+
+also produced no match.
+
+Therefore the string is currently classified as:
+
+```text
+present but without a confirmed direct consumer
+```
+
+Possible explanations include:
+
+```text
+dead / legacy string
+runtime string decoding
+indirect address construction
+protected consumer
+copied runtime table
+```
+
+No policy conclusion is currently derived from the string alone.
+
+---
+
+# Important Runtime Strings
 
 Recovered values include:
 
 ```text
+***remote***
+***shutdown***
+***touchpadswipe***
+***hacked***
+***resedit*** {%s}
+***vmdetected***
+
+VM Detected
+VM allowed - skipping
+vm_device
+moosevm
+
 ALLOW_MONITOR
+
 BlockRecording
 AllowRecording
 AllowCapture
@@ -2153,395 +2293,256 @@ BlockSplitters
 BlockTeramind
 AllowGameBar
 AllowCopyPaste
+
+Sysinternals
+
+PROGRAM HACKED OR INFECTED
+AUTOLAUNCH SHIM DETECTED
+FRGND CHECK TMPR
+KEYBOARD HOOK REMOVED
+ADMIN RIGHTS REMOVED
+
+Hacked Sysinternals Desktops in use
+Blocklisted process hacked to prevent detection %s = %s
+Detected recording or capture file = %s
+Core Mismatch Moose - %s %d
+Hacking program detected - %s
+MonitorPrestartComplete
+
+Parallels
+FaceTime HD
+
+winex11.drv
+winepulse.drv
+
+CANARY
 ```
 
-This strongly suggests that significant portions of Respondus behavior are policy-controlled rather than universally hard-coded to one response.
+A recovered string by itself is not considered proof of an active detection or enforcement mechanism.
 
 ---
 
-# Respondus Infrastructure
-
-Recovered hostnames include:
+# Current VM / Environment Map
 
 ```text
-campusportal.respondus.com
-server-profiles-respondus-com.s3-external-1.amazonaws.com
-smc-service-cloud.respondus2.com
-help-center-respondus-com.s3.amazonaws.com
-notification-images-respondus-com.s3.amazonaws.com
-autolaunch.respondus2.com
-downloads.respondus.com
-```
+Hardware / Platform
+|
++-- system identity
+|   +-- PRLS
+|   +-- VBOX
+|   +-- VRTUAL
+|   +-- VMWare
+|
++-- Registry
+|   |
+|   +-- VideoBiosVersion
+|   |   +-- Parallels
+|   |   +-- Sun VirtualBox
+|   |
+|   +-- SystemManufacturer
+|   |   +-- VMWare
+|   |
+|   +-- ProcessorNameString
+|       +-- QEMU
+|
++-- SetupAPI Devices
+|   |
+|   +-- DEVICEDESC
+|   +-- FRIENDLYNAME
+|       |
+|       +-- 26-entry VM prefix list
+|       +-- VBoxAsw special handling
+|
++-- COM FriendlyName
+    |
+    +-- FaceTime HD
+         |
+         +-- +0x4653A
+              |
+              +-- rldbvm=1
 
-Recovered paths include:
 
-```text
-/services/ldb/offline-allow.htm
-/overrides/cldb8675309.htm
-/MONServer/ldb/sdk_expired.do
+Runtime / Software Environment
+|
++-- Username-related selector
+|
++-- Process / module paths
+|   +-- selector 8
+|   +-- selector 10
+|
++-- Periodically refreshed runtime artifact vector
+    +-- selector 8
+    +-- selector 9
+         |
+         +-- rldbvm=2
+
+
+Device Expectation
+|
++-- expected display-like device
+|   +-- graphics
+|   +-- nvidia
+|   +-- amd
+|   +-- matrox
+|   +-- " arc "
+|
++-- expected PCI root
+    +-- PCI Express Root
+         |
+         +-- both mismatched
+              |
+              +-- rldbvm=3
+
+
+Shared Artifact Detection
+|
++-- runtime artifact vector
+|   |
+|   +-- VM2 signatures
+|   +-- PTC 4,1
+|
++-- ordered signature search
+    |
+    +-- PTC 4,2
+         |
+         +-- +0x2D5
+              |
+              +-- rldbdetect=4
 ```
 
 ---
 
-# Confirmed vs. Unconfirmed Findings
+# Confirmed vs. Open Findings
 
 | Finding | Status |
 | --- | --- |
-| Device enumeration | ✅ Confirmed |
-| `SPDRP_DEVICEDESC` inspection | ✅ Confirmed |
-| `SPDRP_FRIENDLYNAME` inspection | ✅ Confirmed |
-| Case-insensitive prefix matcher | ✅ Confirmed |
-| Case-insensitive substring matcher | ✅ Confirmed |
-| Full VM/device prefix array recovered | ✅ Confirmed |
-| Device prefix count = 26 | ✅ Confirmed |
-| Device prefixes applied to DEVICEDESC | ✅ Confirmed |
-| Device prefixes applied to FRIENDLYNAME | ✅ Confirmed |
-| Parallels device indicators | ✅ Confirmed |
-| VMware device indicators | ✅ Confirmed |
-| VirtualBox device indicator `VBOX` | ✅ Confirmed |
-| QEMU device indicator | ✅ Confirmed |
-| Xen device indicator | ✅ Confirmed |
-| Microsoft virtual-device indicator | ✅ Confirmed |
-| VirtIO device indicator | ✅ Confirmed |
+| Runtime string table architecture | ✅ Confirmed |
+| Prefix comparator | ✅ Confirmed |
+| Prefix comparator returns `0` on match | ✅ Confirmed |
+| Substring comparator | ✅ Confirmed |
+| Full 26-entry VM device array | ✅ Confirmed |
+| BIOS/registry VM structure | ✅ Confirmed |
+| VMware indicators | ✅ Confirmed |
+| VirtualBox indicators | ✅ Confirmed |
+| Parallels indicators | ✅ Confirmed |
+| QEMU indicators | ✅ Confirmed |
+| Xen indicators | ✅ Confirmed |
+| VirtIO indicators | ✅ Confirmed |
 | AWS virtual-device indicators | ✅ Confirmed |
 | Wine virtual-device indicators | ✅ Confirmed |
-| BIOS registry inspection | ✅ Confirmed |
-| `VideoBiosVersion` inspection | ✅ Confirmed |
-| `SystemManufacturer` inspection | ✅ Confirmed |
-| CPU `ProcessorNameString` inspection | ✅ Confirmed |
-| Parallels registry comparison | ✅ Confirmed |
-| VMware registry comparison | ✅ Confirmed |
-| Sun VirtualBox registry comparison | ✅ Confirmed |
-| QEMU CPU comparison | ✅ Confirmed |
-| `PRLS` system-identity comparison | ✅ Confirmed |
-| `VBOX` system-identity comparison | ✅ Confirmed |
-| `VMWare` system-identity comparison | ✅ Confirmed |
-| `VRTUAL` system-identity comparison | ✅ Confirmed |
-| `VBoxAsw` actively consumed | ✅ Confirmed |
-| `VBoxAsw` special-case exclusion in `FUN_1402b30d0` | ✅ Confirmed |
-| FNV-1a device de-duplication | ✅ Confirmed |
-| Detection state ORed into `+0x46518` | ✅ Confirmed |
-| Detection state ORed into `+0x4651c` | ✅ Confirmed |
-| `FaceTime HD` FriendlyName matching | ✅ Confirmed |
-| `Parallels` broader platform matching | ✅ Confirmed |
-| Cameyo virtualization string actively consumed | ✅ Confirmed |
-| `winex11.drv` actively consumed | ✅ Confirmed |
-| Process enumeration capability | ✅ Confirmed |
-| Module enumeration capability | ✅ Confirmed |
-| Service inspection capability | ✅ Confirmed |
-| RDP/session inspection | ✅ Confirmed |
-| Sysinternals runtime string consumption | ✅ Confirmed |
-| Recording/remote-control process table exists | ✅ Confirmed |
-| Accessibility process table exists | ✅ Confirmed |
-| Browser process table exists | ✅ Confirmed |
-| Kernel filesystem minifilter | ✅ Confirmed |
-| Kernel process callback capability | ✅ Confirmed |
-| Kernel thread callback capability | ✅ Confirmed |
-| Kernel image-load callback capability | ✅ Confirmed |
-| User/kernel communication capability | ✅ Confirmed |
-| Every `0x09D8` entry always hard-blocked | ⚠️ Not yet confirmed |
-| Exact consumer of `0x09D8` | ⚠️ Not yet confirmed |
-| Accessibility list is a blacklist | ⚠️ Not confirmed |
-| Exact meaning of `+0x46518` downstream | ⚠️ Not yet confirmed |
-| Exact meaning of `+0x4651c` downstream | ⚠️ Not yet confirmed |
-| Exact meaning of `rldbvm=1` | ⚠️ Not yet confirmed |
-| Exact meaning of `rldbvm=2` | ⚠️ Not yet confirmed |
-| Exact meaning of `rldbvm=3` | ⚠️ Not yet confirmed |
-| CPUID hypervisor-bit check | ⚠️ Not yet confirmed |
-| Complete SMBIOS parsing behavior | ⚠️ Not yet confirmed |
-| Exact driver communication protocol | ⚠️ Not yet confirmed |
-| Exact cryptographic message format | ⚠️ Not yet confirmed |
+| Cameyo indicators actively consumed | ✅ Confirmed |
+| `VBoxAsw` special-case behavior | ✅ Confirmed |
+| FNV-1a device inventory | ✅ Confirmed |
+| `rldbvm=1` writer architecture | ✅ Substantially mapped |
+| `rldbvm=2` three-writer architecture | ✅ Confirmed |
+| VM2 process/module path detection | ✅ Confirmed |
+| VM2 periodic artifact vector | ✅ Confirmed |
+| `rldbvm=3` device expectation rules | ✅ Confirmed |
+| VM3 requires >1 mismatch | ✅ Confirmed |
+| `rldbdetect=4` PTC 4,1 | ✅ Confirmed |
+| `rldbdetect=4` PTC 4,2 | ✅ Confirmed |
+| `+0x2D5` latched once detected | ✅ Confirmed |
+| Direct VM2 readers are telemetry/status paths | ✅ Confirmed |
+| Frida spawn causes startup failure | ✅ Observed |
+| Frida attach destabilizes processes | ✅ Observed |
+| Overlapping instruction streams | ✅ Confirmed |
+| Synthetic return chains | ✅ Confirmed |
+| Opaque predicates | ✅ Confirmed |
+| `+0x466F4` one-shot latch | ✅ Confirmed |
+| `"VM allowed - skipping"` direct consumer | ⚠️ Not found |
+| Exact `rldbvm=1` semantic label | ⚠️ Open |
+| Exact selector 8/9/10 strings | ⚠️ Open |
+| Exact VM2 artifact record type | ⚠️ Open |
+| Exact downstream consumer of `+0x46518` | ⚠️ Open |
+| Exact downstream consumer of `+0x4651C` | ⚠️ Open |
+| Exact enforcement action for VM classification | ⚠️ Open |
+| `0x09D8` exact consumer | ⚠️ Open |
+| `0x09ED` exact purpose | ⚠️ Open |
+| Full Wine consumer path | ⚠️ Open |
+| Full Cameyo consumer path | ⚠️ Open |
+| Full Sysinternals desktop path | ⚠️ Open |
+| Exact user/kernel protocol | ⚠️ Open |
+| Driver IOCTL map | ⚠️ Open |
+| Exact cryptographic protocol | ⚠️ Open |
 
 ---
 
-# Highest-Value Confirmed Environment Indicators
+# Current Research Priorities
+
+## 1. Map User/Kernel Communication
+
+Highest-value APIs:
 
 ```text
-PRLS
-Parallels
-Parallels Video Driver
-Parallels Network Adapter
-Parallels Mouse Synchronization Tool
-PRL Virtual CD-ROM
+CreateFile
+DeviceIoControl
 
-VMWare
-VMWare SVGA II
-VMWare SVGA
-VMWare Pointing Device
-VMWare Accelerated AMD PCNet Adapter
-VMWare SCSI Controller
-VMWare Virtual IDE Hard Drive
-
-VBOX
-Sun VirtualBox
-VBoxAsw
-
-QEMU
-XEN
-Msft Virtual
-Red Hat VirtIO
-
-Amazon Elastic Network Adapter
-Amazon Outbound Audio
-AWS Virtual Camera
-AWS Virtual DOD Driver
-AWS Virtual Microphone Device
-
-Wine HID
-Wine Adapter
-Wine USB
-winex11.drv
-winepulse.drv
-
-CAMEYO_VIRTUALAPP
-CAMEYO_RO_VIRTUALAPP
-CAMEYO_RO_PROPERTY_VIRTUALAPP
-
-VM Additions S3 Trio32/64
-VM Additions PS/2 Port Mouse
-VM Additions PC/AT Enhanced PS/2 Keyboard
-
-VRTUAL
-
-HARDWARE\DESCRIPTION\System
-VideoBiosVersion
-
-HARDWARE\DESCRIPTION\System\BIOS
-SystemManufacturer
-
-HARDWARE\DESCRIPTION\System\CentralProcessor\0
-ProcessorNameString
+FltCreateCommunicationPort
+FltSendMessage
 ```
+
+Primary goal:
+
+```text
+EXE/service
+    |
+    +-- device/channel acquisition
+    |
+    +-- command / IOCTL
+    |
+    +-- input buffer
+    |
+    +-- output buffer
+    |
+    +-- LockDownService215.sys
+```
+
+This should clarify which Respondus responsibilities have moved into kernel mode.
 
 ---
 
-# Current Reverse Engineering Map
+## 2. Find Detection Consumers
+
+Instead of continuing through protected detector internals, prioritize consumers of consolidated state.
+
+Targets include:
 
 ```text
-Machine / System Identity
-        |
-        +--> PRLS             [prefix]
-        +--> VBOX             [prefix]
-        +--> VRTUAL           [prefix]
-        +--> VMWare           [substring]
++0x46518
++0x4651C
 
-
-HKLM\HARDWARE\DESCRIPTION\System
-        |
-        +--> VideoBiosVersion
-                |
-                +--> Parallels
-                +--> Sun VirtualBox
-
-
-HKLM\HARDWARE\DESCRIPTION\System\BIOS
-        |
-        +--> SystemManufacturer
-                |
-                +--> VMWare
-
-
-HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0
-        |
-        +--> ProcessorNameString
-                |
-                +--> QEMU
-
-
-Windows SetupAPI
-        |
-        +--> SPDRP_DEVICEDESC
-        |
-        +--> SPDRP_FRIENDLYNAME
-                |
-                +--> VBoxAsw special case
-                |
-                +--> 26-entry VM/device prefix list
-                        |
-                        +--> Parallels
-                        +--> VMware
-                        +--> VM Additions
-                        +--> VBOX
-                        +--> QEMU
-                        +--> XEN
-                        +--> Microsoft Virtual
-                        +--> VirtIO
-                        +--> AWS virtual devices
-                        +--> Wine
-
-
-Device Inventory
-        |
-        +--> FNV-1a 64-bit
-        |
-        +--> de-duplication
-        |
-        +--> diagnostic device list
-
-
-Combined FUN_1402b30d0 detection
-        |
-        +--> DAT_140ccc948 + 0x46518
-        |
-        +--> DAT_140ccc948 + 0x4651c
-
-
-COM Enumeration
-        |
-        +--> FriendlyName
-                |
-                +--> FaceTime HD
-                        |
-                        +--> +0x4653a
-                                |
-                                +--> FUN_1402141b0
-                                        |
-                                        +--> +0x4664a
-                                                |
-                                                +--> rldbvm = 1
-
-
-Wine / Cameyo
-        |
-        +--> CAMEYO_* values
-        +--> winex11.drv
-        +--> winepulse.drv
-
-
-Desktop / Session Logic
-        |
-        +--> WinSta0
-        +--> Sysinternals
-        +--> Default
-        +--> Winlogon
-        +--> WTS APIs
-        +--> Terminal Server registry
-
-
-Process Monitoring
-        |
-        +--> Recording / remote-control table
-        +--> Browser table
-        +--> Individual process indicators
-        +--> Accessibility table
-
-
-Kernel Driver
-        |
-        +--> Filesystem minifilter
-        +--> Process callbacks
-        +--> Thread callbacks
-        +--> Image-load callbacks
-        +--> Communication port
-```
-
----
-
-# Next Research Targets
-
-## 1. Trace `+0x46518`
-
-`FUN_1402b30d0` ORs its consolidated environment-detection result into:
-
-```text
-DAT_140ccc948 + 0x46518
-```
-
-### Goal
-
-Identify:
-
-```text
-who reads it
-        |
-        v
-what decision it influences
-        |
-        v
-whether it feeds rldbvm / rldbdetect / telemetry / enforcement
-```
-
----
-
-## 2. Trace `+0x4651c`
-
-The same detection result is also ORed into:
-
-```text
-DAT_140ccc948 + 0x4651c
-```
-
-Determine why two persistent fields receive the same result and how their downstream consumers differ.
-
----
-
-## 3. Finish `rldbvm` State Mapping
-
-Continue tracing writers/readers for:
-
-```text
-+0x4664a
-+0x4664b
++0x4664A
++0x4664B
 +0x46538
+
+rldbvm
+rldbdetect
 ```
 
 Goal:
 
 ```text
-rldbvm = 1 -> exact semantic category
-rldbvm = 2 -> exact semantic category
-rldbvm = 3 -> exact semantic category
+classification
+    ->
+telemetry
+    ->
+policy
+    ->
+observable action
 ```
 
 ---
 
-## 4. Trace the `0x09D8` Process List
+## 3. Finish Wine Path
 
-The runtime entry exists at:
+Known live callsites:
 
 ```text
-table 0x3B
-index 0x78
-ID 0x09D8
+0x1402B52C9
+0x1402B52E3
 ```
 
-but was not observed being retrieved through `FUN_1401fc0e0` during the traced startup run.
-
-### Goal
-
-Determine whether it is:
-
-- copied during initialization,
-- retrieved through another function,
-- policy-conditional,
-- tokenized elsewhere,
-- or consumed later during exam startup.
-
-Then determine whether entries represent:
-
-- exact process blocks,
-- substring matches,
-- monitor-only entries,
-- terminate-on-detection entries,
-- policy-controlled entries.
-
----
-
-## 5. Trace the `0x09ED` Accessibility List
-
-Determine whether the accessibility process table is:
-
-- an allowlist,
-- compatibility list,
-- exception list,
-- monitoring list,
-- or blocklist.
-
----
-
-## 6. Trace Wine Detection
-
-Known live values:
+Known values:
 
 ```text
 winex11.drv
@@ -2551,22 +2552,17 @@ Wine Adapter
 Wine USB
 ```
 
-Priority callsites:
-
-```text
-0x1402b52c9
-0x1402b52e3
-```
-
-Goal:
-
-Identify the inspected object and resulting detection flag.
-
 ---
 
-## 7. Trace Cameyo Detection
+## 4. Finish Cameyo Path
 
-Known runtime list:
+Known consumer:
+
+```text
+0x1402B5131
+```
+
+Known indicators:
 
 ```text
 CAMEYO_VIRTUALAPP
@@ -2574,27 +2570,11 @@ CAMEYO_RO_VIRTUALAPP
 CAMEYO_RO_PROPERTY_VIRTUALAPP
 ```
 
-Known live caller:
-
-```text
-0x1402b5131
-```
-
-Goal:
-
-Determine whether the code checks:
-
-- environment variables,
-- registry values,
-- loaded modules,
-- process state,
-- or another virtualization artifact.
-
 ---
 
-## 8. Finish Sysinternals/Desktop Mapping
+## 5. Finish Sysinternals / Desktop Path
 
-Known runtime lookup cluster:
+Known runtime cluster:
 
 ```text
 Sysinternals
@@ -2605,229 +2585,194 @@ Winlogon
 Known callsites:
 
 ```text
-0x1402227c0
-0x1402227da
-0x1402227f4
-```
-
-Goal:
-
-Confirm the exact Windows desktop/window-station detection mechanism and relationship to:
-
-```text
-Hacked Sysinternals Desktops in use
+0x1402227C0
+0x1402227DA
+0x1402227F4
 ```
 
 ---
 
-## 9. Map Service Detection
+## 6. Map Process / Runtime Artifact Collections
 
-The executable contains extensive Windows service-management capability.
-
-Goal:
-
-Recover any service-name lists associated with:
-
-- VM tools,
-- remote software,
-- monitoring tools,
-- virtualization products,
-- tamper indicators.
-
----
-
-## 10. Reverse User/Kernel Communication
-
-Priority APIs:
+Important unresolved structures:
 
 ```text
-FltCreateCommunicationPort
-FltSendMessage
-CreateFile
-DeviceIoControl
+0x09D8 recording / remote-control table
+0x09ED accessibility table
+
+state + 0x464B0 runtime artifact vector
+state + 0x3F0 ordered signature array
 ```
-
-Goal:
-
-Document:
-
-- communication channel,
-- commands,
-- message types,
-- event IDs,
-- driver → user messages,
-- user → driver commands,
-- role of encryption/hashing.
 
 ---
 
 # Current Conclusion
 
-Respondus LockDown Browser `2.1.5.01` implements a broad and layered environment-classification system rather than a single VM-detection check.
+Respondus LockDown Browser 2.1.5.01 clearly performs extensive environment classification across both user mode and kernel mode.
 
-The research now confirms multiple independent detection surfaces.
+The VM-related architecture is now substantially clearer.
 
-## Confirmed VM / Environment Surfaces
-
-```text
-System identity
-BIOS registry
-Video BIOS identity
-System manufacturer
-CPU identity
-Device descriptions
-Device friendly names
-COM FriendlyName values
-Wine driver/module indicators
-Cameyo virtualization indicators
-Windows desktop/session state
-```
-
-## Confirmed VM / Virtualization Families
+`rldbvm=1` is associated primarily with:
 
 ```text
-Parallels
-VMware
-VirtualBox
-QEMU
-Xen
-Microsoft virtual hardware
-VirtIO / Red Hat
-AWS virtual hardware
-Wine
-Cameyo
-older VM Additions-style devices
+hardware
+platform
+machine classification
+COM device identity
 ```
 
-The strongest new finding is the recovery of the full **26-entry runtime VM/device prefix list** and the accompanying **BIOS/registry detection configuration structure**.
-
-This moves the analysis beyond inference from imported APIs or isolated strings.
-
-For `FUN_1402b30d0`, we now know:
+`rldbvm=2` is associated primarily with:
 
 ```text
-what Windows properties are inspected,
-what registry values are queried,
-what strings are compared,
-what comparison semantics are used,
-what device prefixes are searched,
-how device strings are inventoried,
-and which persistent detection fields receive the result.
+username/environment artifacts
+process/module paths
+periodically refreshed named runtime artifacts
 ```
 
-The primary unresolved question has shifted.
+`rldbvm=3` is associated with:
 
-It is no longer:
+```text
+expected hardware/device consistency
+```
 
-> Does Respondus detect virtualized environments?
+These classification systems coexist with a separate `rldbdetect` mechanism containing broader hack/tamper detections.
 
-That is conclusively established.
+The same runtime artifact collection can participate in both:
 
-The main remaining question is:
+```text
+VM classification
+and
+hack-type detection
+```
 
-> How do the individual environment-detection accumulators flow into the final `rldbvm`, `rldbdetect`, telemetry, policy, and enforcement decisions?
+which demonstrates that Respondus does not maintain perfectly isolated detection subsystems.
+
+The kernel driver additionally provides:
+
+```text
+filesystem visibility
+process callbacks
+thread callbacks
+image-load callbacks
+user/kernel communication
+```
+
+making this build more than a purely user-mode browser lockdown mechanism.
+
+The newest major architectural finding is the executable's protected control flow.
+
+Respondus contains code regions using:
+
+```text
+overlapping instructions
+embedded RET gadgets
+synthetic return stacks
+opaque predicates
+computed dispatch
+```
+
+This explains many previously confusing Ghidra decompilations and means that raw static function boundaries cannot always be trusted.
+
+At the current stage, continuing to manually decode these protected dispatcher chains produces significantly less value than tracing:
+
+```text
+detection consumers
+policy state
+kernel communication
+and observable system effects
+```
+
+The primary remaining architectural question is therefore:
+
+> How are the already-confirmed environment classifications transformed into final policy and enforcement decisions, and which portions of that decision process are delegated to `LockDownService215.sys`?
 
 ---
 
-# Research Status Summary
+# Research Status
 
 ```text
-[CONFIRMED] Runtime string table architecture
-[CONFIRMED] Table 0x3B lookup mechanism
-[CONFIRMED] Case-insensitive prefix helper
-[CONFIRMED] Case-insensitive substring helper
-
+[CONFIRMED] Runtime string table
+[CONFIRMED] Prefix comparison helper
+[CONFIRMED] Substring comparison helper
 [CONFIRMED] Device enumeration
-[CONFIRMED] SPDRP_DEVICEDESC inspection
-[CONFIRMED] SPDRP_FRIENDLYNAME inspection
+[CONFIRMED] DEVICEDESC checks
+[CONFIRMED] FRIENDLYNAME checks
 
-[CONFIRMED] Full 26-entry VM/device prefix array
-[CONFIRMED] Device prefix count = 26
-[CONFIRMED] Parallels device checks
-[CONFIRMED] VMware device checks
-[CONFIRMED] VirtualBox device checks
-[CONFIRMED] QEMU device checks
-[CONFIRMED] Xen device checks
+[CONFIRMED] 26-entry VM/device prefix array
+
+[CONFIRMED] Parallels checks
+[CONFIRMED] VMware checks
+[CONFIRMED] VirtualBox checks
+[CONFIRMED] QEMU checks
+[CONFIRMED] Xen checks
 [CONFIRMED] Microsoft virtual-device checks
 [CONFIRMED] VirtIO checks
 [CONFIRMED] AWS virtual-device checks
 [CONFIRMED] Wine virtual-device checks
 
-[CONFIRMED] HARDWARE\DESCRIPTION\System inspection
+[CONFIRMED] BIOS registry inspection
 [CONFIRMED] VideoBiosVersion inspection
-[CONFIRMED] Parallels Video BIOS comparison
-[CONFIRMED] Sun VirtualBox Video BIOS comparison
-
-[CONFIRMED] HARDWARE\DESCRIPTION\System\BIOS inspection
 [CONFIRMED] SystemManufacturer inspection
-[CONFIRMED] VMware manufacturer comparison
-
-[CONFIRMED] HARDWARE\DESCRIPTION\System\CentralProcessor\0 inspection
 [CONFIRMED] ProcessorNameString inspection
-[CONFIRMED] QEMU CPU comparison
 
-[CONFIRMED] PRLS system-identity comparison
-[CONFIRMED] VBOX system-identity comparison
-[CONFIRMED] VMWare system-identity comparison
-[CONFIRMED] VRTUAL system-identity comparison
+[CONFIRMED] FNV-1a device inventory
 
-[CONFIRMED] VBoxAsw active runtime lookup
-[CONFIRMED] VBoxAsw special-case exclusion behavior
+[CONFIRMED] rldbvm=1 writer
+[CONFIRMED] rldbvm=2 has three independent writers
+[CONFIRMED] rldbvm=2 process/module path checks
+[CONFIRMED] rldbvm=2 runtime artifact vector
+[CONFIRMED] VM2 artifact vector is periodically refreshed
 
-[CONFIRMED] FNV-1a 64-bit device hashing
-[CONFIRMED] Device inventory de-duplication
-[CONFIRMED] Detection result -> +0x46518
-[CONFIRMED] Detection result -> +0x4651c
+[CONFIRMED] rldbvm=3 device-expectation mechanism
+[CONFIRMED] VM3 graphics/device rule
+[CONFIRMED] VM3 PCI Express Root rule
 
-[CONFIRMED] FaceTime HD FriendlyName matching
-[CONFIRMED] Parallels broader platform matching
-[CONFIRMED] Apple M1 Pro special-case handling
+[CONFIRMED] rldbdetect=4 PTC 4,1
+[CONFIRMED] rldbdetect=4 PTC 4,2
+[CONFIRMED] code 4 is latched
 
-[CONFIRMED] Cameyo virtualization string actively consumed
-[CONFIRMED] winex11.drv actively consumed
-[CONFIRMED] Wine driver strings present
-
-[CONFIRMED] Process enumeration capability
-[CONFIRMED] Module enumeration capability
-[CONFIRMED] Service inspection capability
-[CONFIRMED] Registry inspection
-[CONFIRMED] Windows session/RDP inspection
-
-[CONFIRMED] Recording/remote-control process table exists
-[CONFIRMED] Accessibility process table exists
-[CONFIRMED] Browser process table exists
-
+[CONFIRMED] Cameyo indicator consumption
+[CONFIRMED] Wine indicator consumption
 [CONFIRMED] Sysinternals runtime handling
-[CONFIRMED] Speech/voice preference inspection
+[CONFIRMED] Windows session/RDP handling
+[CONFIRMED] speech preference inspection
 
-[CONFIRMED] Kernel filesystem minifilter
-[CONFIRMED] Kernel process callbacks
-[CONFIRMED] Kernel thread callbacks
-[CONFIRMED] Kernel image-load callbacks
-[CONFIRMED] User/kernel communication capability
+[CONFIRMED] filesystem minifilter
+[CONFIRMED] kernel process callbacks
+[CONFIRMED] kernel thread callbacks
+[CONFIRMED] kernel image-load callbacks
+[CONFIRMED] user/kernel communication capability
 
-[OPEN] Downstream meaning of +0x46518
-[OPEN] Downstream meaning of +0x4651c
+[CONFIRMED] instrumentation-sensitive behavior
+[CONFIRMED] overlapping instruction streams
+[CONFIRMED] synthetic return chains
+[CONFIRMED] embedded RET gadgets
+[CONFIRMED] opaque predicates
+[CONFIRMED] +0x466F4 one-shot latch
 
-[OPEN] Exact meaning of rldbvm=1
-[OPEN] Exact meaning of rldbvm=2
-[OPEN] Exact meaning of rldbvm=3
+[OPEN] Exact rldbvm=1 semantic category
+[OPEN] Exact selector 8 string
+[OPEN] Exact selector 9 string
+[OPEN] Exact selector 10 string
+[OPEN] Exact VM2 artifact record type
 
-[OPEN] Exact 0x09D8 enforcement behavior
+[OPEN] +0x46518 downstream consumer
+[OPEN] +0x4651C downstream consumer
+
+[OPEN] Exact VM enforcement consumer
+[OPEN] Exact policy transition following classification
+
 [OPEN] Exact 0x09D8 consumer
+[OPEN] Exact 0x09ED purpose
 
-[OPEN] Exact purpose of 0x09ED accessibility table
+[OPEN] Full Wine path
+[OPEN] Full Cameyo path
+[OPEN] Full Sysinternals desktop path
 
-[OPEN] Complete Wine detection path
-[OPEN] Complete Cameyo detection path
-[OPEN] Complete Sysinternals desktop-detection path
-
-[OPEN] Full service detection table
-[OPEN] CPUID hypervisor-bit behavior
-[OPEN] Additional SMBIOS parsing behavior
-
-[OPEN] Exact kernel communication protocol
-[OPEN] Exact cryptographic message format
+[OPEN] Driver IOCTL interface
+[OPEN] Minifilter communication protocol
+[OPEN] Driver command/event identifiers
+[OPEN] Exact cryptographic protocol
 ```
 
 ---
@@ -2836,44 +2781,49 @@ The main remaining question is:
 
 Special thanks to [arcticdev00](https://github.com/arcticdev00) and the [Respondus-LDB-Offsets](https://github.com/arcticdev00/Respondus-LDB-Offsets) project.
 
-That work on the previous version of Respondus LockDown Browser provided an important foundation and starting point for this research.
+That research on an earlier Respondus version provided an important starting point for this work.
 
-This analysis extends that earlier work to version:
+This repository extends the analysis to:
 
 ```text
-2.1.5.01
+Respondus LockDown Browser 2.1.5.01
 ```
 
-with additional:
+with additional work covering:
 
-- static analysis
-- dynamic instrumentation
-- runtime string-table recovery
-- VM/device prefix recovery
-- BIOS/registry detection reconstruction
-- process/application list recovery
-- environment-detection tracing
-- Windows session research
-- kernel-driver analysis
+```text
+runtime string-table reconstruction
+device prefix recovery
+BIOS/registry detection
+VM state mapping
+runtime artifact collections
+rldbdetect behavior
+dynamic instrumentation
+kernel-driver architecture
+protected control-flow reconstruction
+```
 
 ---
 
 # Disclaimer
 
-This repository is intended as technical documentation of observed software behavior derived from reverse-engineering research.
+This repository documents software behavior observed through reverse-engineering research.
 
-It records:
+It includes:
 
-- static-analysis findings
-- dynamic-analysis findings
-- runtime observations
-- imported API capabilities
-- recovered strings
-- internal structures
-- detection-state observations
-- confirmed findings
-- unresolved research questions
+```text
+static-analysis findings
+dynamic-analysis findings
+runtime observations
+API capabilities
+recovered strings
+internal data structures
+detection-state mappings
+control-flow reconstruction
+kernel-driver analysis
+unresolved research questions
+```
 
-Where the exact purpose of a recovered value has not been established, the repository explicitly labels that conclusion as unconfirmed rather than presenting speculation as fact.
+Where evidence is incomplete, findings are explicitly labeled as unconfirmed.
 
 This repository does not provide a working examination-security bypass.
